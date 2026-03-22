@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph Dijkstra Visualizer</title>
+    <!-- Sử dụng Tailwind CSS qua CDN để dựng layout nhanh -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome cho icon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Tùy chỉnh thanh cuộn cho giống app desktop */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555; 
+        }
+        
+        /* Giả lập node trên canvas */
+        .node {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            position: absolute;
+            cursor: grab;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .node.active { border: 2px solid #3b82f6; background-color: #dbeafe; }
+        .node.path { background-color: #22c55e; color: white; border: 2px solid #15803d; }
+        .node.visited { background-color: #9ca3af; color: white; }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen w-screen overflow-hidden flex flex-col text-sm text-gray-800 font-sans">
+
+    <!-- 1. HEADER / MENU APP -->
+    <!-- Trong Electron, phần này thường thay thế title bar hoặc nằm ngay dưới nó -->
+    <header class="bg-white border-b border-gray-200 h-12 flex items-center justify-between px-4 select-none shadow-sm z-10">
+        <div class="flex items-center gap-4">
+            <div class="font-bold text-lg text-blue-600"><i class="fa-solid fa-project-diagram mr-2"></i>Dijkstra Viz</div>
+            <nav class="hidden md:flex gap-1 text-gray-600">
+                <button class="hover:bg-gray-100 px-3 py-1 rounded">Tập tin</button>
+                <button class="hover:bg-gray-100 px-3 py-1 rounded">Chỉnh sửa</button>
+                <button class="hover:bg-gray-100 px-3 py-1 rounded">Giao diện</button>
+                <button class="hover:bg-gray-100 px-3 py-1 rounded">Trợ giúp</button>
+            </nav>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-xs text-gray-400">v1.0.0</span>
+            <button class="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center">
+                <i class="fa-solid fa-gear"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT AREA -->
+    <div class="flex-1 flex overflow-hidden">
+        
+        <!-- 2. SIDEBAR: INPUT & CONTROLS -->
+        <aside class="w-80 bg-white border-r border-gray-200 flex flex-col z-10 shadow-lg">
+            <div class="p-4 border-b border-gray-100">
+                <h3 class="font-semibold mb-2 text-gray-700"><i class="fa-solid fa-database mr-2"></i>Dữ liệu đồ thị</h3>
+                <p class="text-xs text-gray-500 mb-2">Nhập danh sách kề (Format: A-B:5)</p>
+                <textarea 
+                    class="w-full h-32 p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-mono text-xs resize-none"
+                    placeholder="A-B:4&#10;A-C:2&#10;B-C:5&#10;B-D:10&#10;C-E:3">A-B:4
+A-C:2
+B-E:3
+C-D:2
+C-F:4
+D-E:3
+D-F:1
+E-F:1</textarea>
+                <div class="flex justify-end mt-2">
+                    <button class="text-blue-600 text-xs hover:underline"><i class="fa-solid fa-upload mr-1"></i>Nhập từ JSON</button>
+                </div>
+            </div>
+
+            <div class="p-4 border-b border-gray-100">
+                <h3 class="font-semibold mb-3 text-gray-700"><i class="fa-solid fa-route mr-2"></i>Cấu hình thuật toán</h3>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Điểm bắt đầu</label>
+                        <select class="w-full border border-gray-300 rounded p-1.5 focus:ring-blue-500 outline-none">
+                            <option>A</option>
+                            <option>B</option>
+                            <option>C</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Điểm kết thúc</label>
+                        <select class="w-full border border-gray-300 rounded p-1.5 focus:ring-blue-500 outline-none">
+                            <option>F</option>
+                            <option>E</option>
+                            <option>D</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="flex gap-2">
+                    <button class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded shadow transition font-medium">
+                        <i class="fa-solid fa-play mr-1"></i> Chạy ngay
+                    </button>
+                    <button class="px-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded transition" title="Xóa">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- OUTPUT KẾT QUẢ NGẮN GỌN -->
+            <div class="flex-1 overflow-y-auto p-4 bg-gray-50">
+                <h3 class="font-semibold mb-2 text-gray-700">Kết quả</h3>
+                <div class="bg-white p-3 rounded border border-green-200 shadow-sm mb-3">
+                    <div class="text-xs text-gray-500 uppercase font-bold tracking-wider">Đường đi ngắn nhất</div>
+                    <div class="text-lg font-bold text-green-700 flex items-center gap-2 mt-1">
+                        A <i class="fa-solid fa-arrow-right text-xs"></i> C <i class="fa-solid fa-arrow-right text-xs"></i> D <i class="fa-solid fa-arrow-right text-xs"></i> F
+                    </div>
+                    <div class="mt-2 text-sm border-t pt-2 flex justify-between">
+                        <span>Tổng trọng số:</span>
+                        <span class="font-bold">5</span>
+                    </div>
+                </div>
+                
+                <!-- Bảng Log từng bước -->
+                <div class="space-y-2">
+                    <div class="text-xs text-gray-500 uppercase font-bold">Logs thực thi</div>
+                    <div class="text-xs font-mono bg-white p-2 rounded border border-gray-200">
+                        <p class="text-green-600">> Init distances...</p>
+                        <p>> Visiting A (0)</p>
+                        <p>> Update C: 2</p>
+                        <p>> Update B: 4</p>
+                        <p>> Visiting C (2)</p>
+                        <p>> Update D: 4 (2+2)</p>
+                        <p>> Found path to F!</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 3. CANVAS AREA: VISUALIZATION -->
+        <section class="flex-1 flex flex-col relative bg-slate-100">
+            <!-- Toolbar trên Canvas -->
+            <div class="absolute top-4 left-4 right-4 h-10 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-gray-200 flex items-center px-4 justify-between z-10">
+                <div class="flex items-center gap-4 text-gray-600">
+                    <div class="flex gap-1 border-r pr-4">
+                        <button class="p-1.5 rounded hover:bg-blue-50 hover:text-blue-600 transition" title="Chọn"><i class="fa-solid fa-arrow-pointer"></i></button>
+                        <button class="p-1.5 rounded hover:bg-blue-50 hover:text-blue-600 transition" title="Thêm Nút"><i class="fa-solid fa-circle-plus"></i></button>
+                        <button class="p-1.5 rounded hover:bg-blue-50 hover:text-blue-600 transition" title="Thêm Cạnh"><i class="fa-solid fa-share-nodes"></i></button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-semibold">Zoom:</span>
+                        <input type="range" class="w-24 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <span class="text-xs">100%</span>
+                    </div>
+                </div>
+                
+                <!-- Điều khiển Playback (Bonus Feature) -->
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-500 mr-1">Mô phỏng:</span>
+                    <button class="w-7 h-7 flex items-center justify-center rounded bg-gray-100 hover:bg-white border hover:shadow"><i class="fa-solid fa-backward-step text-xs"></i></button>
+                    <button class="w-7 h-7 flex items-center justify-center rounded bg-blue-100 hover:bg-blue-200 border border-blue-200 text-blue-700"><i class="fa-solid fa-play text-xs"></i></button>
+                    <button class="w-7 h-7 flex items-center justify-center rounded bg-gray-100 hover:bg-white border hover:shadow"><i class="fa-solid fa-forward-step text-xs"></i></button>
+                </div>
+            </div>
+
+            <!-- Vùng vẽ đồ thị (Canvas giả lập) -->
+            <div id="graph-container" class="w-full h-full relative overflow-hidden cursor-move">
+                <!-- SVG layer cho các đường nối (Edges) -->
+                <svg class="absolute top-0 left-0 w-full h-full pointer-events-none" style="z-index: 0;">
+                    <!-- Line A-B -->
+                    <line x1="200" y1="300" x2="350" y2="150" stroke="#cbd5e1" stroke-width="2" />
+                    <text x="275" y="225" fill="#64748b" font-size="12" font-weight="bold">4</text>
+                    
+                    <!-- Line A-C -->
+                    <line x1="200" y1="300" x2="350" y2="450" stroke="#22c55e" stroke-width="3" /> <!-- Path active -->
+                    <text x="275" y="375" fill="#15803d" font-size="12" font-weight="bold">2</text>
+                    
+                    <!-- Line C-D -->
+                    <line x1="350" y1="450" x2="550" y2="450" stroke="#22c55e" stroke-width="3" /> <!-- Path active -->
+                    <text x="450" y="440" fill="#15803d" font-size="12" font-weight="bold">2</text>
+
+                    <!-- Line D-F -->
+                    <line x1="550" y1="450" x2="700" y2="300" stroke="#22c55e" stroke-width="3" /> <!-- Path active -->
+                    <text x="625" y="375" fill="#15803d" font-size="12" font-weight="bold">1</text>
+                    
+                    <!-- Các đường khác mờ đi -->
+                    <line x1="350" y1="150" x2="550" y2="150" stroke="#cbd5e1" stroke-width="2" />
+                </svg>
+
+                <!-- Các nút (Nodes) -->
+                <div class="node bg-white border-2 border-gray-400" style="left: 200px; top: 300px; transform: translate(-50%, -50%);">A</div>
+                <div class="node bg-white border-2 border-gray-400" style="left: 350px; top: 150px; transform: translate(-50%, -50%);">B</div>
+                <div class="node path" style="left: 350px; top: 450px; transform: translate(-50%, -50%);">C</div>
+                <div class="node path" style="left: 550px; top: 450px; transform: translate(-50%, -50%);">D</div>
+                <div class="node bg-white border-2 border-gray-400" style="left: 550px; top: 150px; transform: translate(-50%, -50%);">E</div>
+                <div class="node path" style="left: 700px; top: 300px; transform: translate(-50%, -50%);">F</div>
+
+                <!-- Info panel góc dưới phải -->
+                <div class="absolute bottom-4 right-4 bg-white/80 backdrop-blur p-2 rounded text-xs text-gray-500 border pointer-events-none">
+                    X: 1200 | Y: 850 | Zoom: 100%
+                </div>
+            </div>
+        </section>
+    </div>
+    
+    <!-- 4. STATUS BAR (FOOTER) -->
+    <footer class="bg-blue-600 text-white text-xs h-6 flex items-center px-4 justify-between select-none">
+        <div class="flex gap-4">
+            <span><i class="fa-solid fa-circle-check mr-1"></i>Sẵn sàng</span>
+            <span>Nodes: 6</span>
+            <span>Edges: 8</span>
+        </div>
+        <div>
+            <span>Dijkstra Algorithm • Time: 0.02ms</span>
+        </div>
+    </footer>
+
+</body>
+</html>

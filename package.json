@@ -1,0 +1,29 @@
+{
+  "name": "dijkstra-app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron .",
+    "dev": "concurrently \"vite\" \"electron .\"",
+    "build": "vite build"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.4",
+    "concurrently": "^9.2.1",
+    "electron": "^40.2.1",
+    "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.2.0",
+    "bootstrap": "^5.3.0",
+    "d3-force": "^3.0.0",
+    "jquery": "^3.7.1",
+    "popper.js": "^1.16.1",
+    "v-network-graph": "^0.9.22",
+    "vue": "^3.5.27"
+  }
+}
