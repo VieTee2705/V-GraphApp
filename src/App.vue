@@ -21,6 +21,8 @@
                 :nodes="myGraph.nodes"
                 :edges="myGraph.edges"
                 :path-ids="result.pathEdges"
+                :graph-config="graphConfig"
+                @create-node="handleCreateNodeFromCanvas"
         />
       </div>
       <NavBar 
@@ -30,7 +32,13 @@
       />
     </div>
     <div class="col-3 app-side-panel">
-      <AnotherSet/>
+      <AnotherSet
+          :result="result"
+          :start="search.start"
+          :end="search.end"
+          :graph-config="graphConfig"
+          @update-config="handleUpdateGraphConfig"
+      />
     </div>
     <!-- <div class="col-3">
       <ResultView 
@@ -58,11 +66,15 @@ import { Graph } from './Graph.js';
 // 2. Khởi tạo đối tượng đồ thị thực sự từ class và bọc trong reactive
 const myGraph = reactive(new Graph());
 
+// Theo dõi chỉ số đỉnh tiếp theo
+const nextNodeIndex = ref(0);
+
 // (Tùy chọn) Thêm sẵn một vài dữ liệu mẫu để biểu đồ không bị trống lúc mới load
 myGraph.addNode("A", "A", 100, 150);
 myGraph.addNode("B", "B", 300, 50);
 myGraph.addNode("C", "C", 300, 250);
 myGraph.addNode("D", "D", 500, 150);
+nextNodeIndex.value = 4;
 
 myGraph.addEdge("e1", "A", "B", 4);
 myGraph.addEdge("e2", "A", "C", 2);
@@ -73,6 +85,21 @@ myGraph.addEdge("e5", "C", "D", 3);
 // 3. Trạng thái của điểm bắt đầu, điểm kết thúc và cờ xác nhận đã chạy
 const search = reactive({ start: "A", end: "D" });
 
+// Graph config state
+const graphConfig = reactive({
+  distanceMin: 120,
+  chargeStrength: -400,
+  alphaMin: 0.001,
+  nodeRadius: 25,
+  nodeColor: '#E1EFFF',
+  nodeStrokeColor: '#0056B3',
+  edgeWidth: 3,
+  edgeGap: 40,
+  edgeColor: '#cccccc',
+  pathWidth: 6,
+  pathColor: '#0056B3'
+});
+
 // 4. Các hàm xử lý sự kiện từ InputView
 const handleAddNode = (id) => {
    if (!myGraph.nodes[id]) {
@@ -81,6 +108,27 @@ const handleAddNode = (id) => {
      const randomY = Math.random() * 400 + 50;
      myGraph.addNode(id, id, randomX, randomY);
    }
+};
+
+// Hàm tạo đỉnh mới từ double-click trên canvas
+const handleCreateNodeFromCanvas = (coords) => {
+  // Sinh tên đỉnh tự động
+  const nodeName = myGraph.generateNodeName(nextNodeIndex.value);
+  
+  // coords.x, coords.y là tọa độ SVG từ GraphCanvas (đã transform từ viewport coords)
+  // Sử dụng trực tiếp tọa độ SVG để node nằm đúng tại vị trí click
+  let nodeX = Math.round(coords.x);
+  let nodeY = Math.round(coords.y);
+  
+  myGraph.addNode(nodeName, nodeName, nodeX, nodeY);
+  
+  // KHÔNG cố định vị trí - cho phép ForceLayout tự dàn trang nó
+  // myGraph.fixNodePosition(nodeName);
+  
+  // Tăng chỉ số đỉnh tiếp theo
+  nextNodeIndex.value++;
+  
+  console.log(`New node created: ${nodeName} at SVG coords (${nodeX}, ${nodeY})`);
 };
 
 const handleAddEdge = (e) => {
@@ -111,6 +159,12 @@ const runAlgorithm = () => {
   
   // Bạn có thể thêm các logic khác ở đây nếu cần
   console.log("Đã nhận lệnh chạy Dijkstra từ InputView!");
+};
+
+// Hàm cập nhật graph config từ AnotherSet
+const handleUpdateGraphConfig = (newConfig) => {
+  Object.assign(graphConfig, newConfig);
+  console.log("Graph config updated:", graphConfig);
 };
 
 // Nếu người dùng đổi điểm bắt đầu hoặc kết thúc, ta nên reset lại trạng thái
@@ -228,6 +282,11 @@ body {
     background-size: 20px 20px;
     border-radius: 0 0 12px 12px;
     overflow: hidden;
+    /* Ngăn default browser behaviors */
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
 }
 
 .path-badge {
