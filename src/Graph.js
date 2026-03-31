@@ -48,20 +48,6 @@ class Graph {
     return firstChar + secondChar; // AA, AB, AC, ...
   }
 
-  /**
-   * Sinh tên đỉnh tự động theo thứ tự: A, B, C, ..., Z, AA, AB, ...
-   * @param {number} index - Chỉ số đỉnh (0-based)
-   * @returns {string} Tên đỉnh
-   */
-  generateNodeName(index) {
-    if (index < 26) {
-      return String.fromCharCode(65 + index); // A-Z
-    }
-    const firstChar = String.fromCharCode(65 + Math.floor((index - 26) / 26));
-    const secondChar = String.fromCharCode(65 + ((index - 26) % 26));
-    return firstChar + secondChar; // AA, AB, AC, ...
-  }
-
   addNode(id, name, x, y) {
     this.nodes[id] = new Node(id, name, x, y);
   }
@@ -69,16 +55,6 @@ class Graph {
   addEdge(id, source, target, weight) {
     if (this.nodes[source] && this.nodes[target]) {
       this.edges[id] = new Edge(id, source, target, weight);
-    }
-  }
-
-  /**
-   * Cố định vị trí của một đỉnh (ngăn nó trôi do lực layout)
-   * @param {string} nodeId - ID của đỉnh
-   */
-  fixNodePosition(nodeId) {
-    if (this.nodes[nodeId]) {
-      this.nodes[nodeId].fixed = true;
     }
   }
 

@@ -20,6 +20,7 @@
         <GraphCanvas 
                 :nodes="myGraph.nodes"
                 :edges="myGraph.edges"
+                :layouts="layouts"
                 :path-ids="result.pathEdges"
                 :graph-config="graphConfig"
                 @create-node="handleCreateNodeFromCanvas"
@@ -69,12 +70,23 @@ const myGraph = reactive(new Graph());
 // Theo dõi chỉ số đỉnh tiếp theo
 const nextNodeIndex = ref(0);
 
+// State để quản lý tọa độ của các node (bắt buộc cho v-network-graph)
+const layouts = reactive({
+  nodes: {}
+});
+
 // (Tùy chọn) Thêm sẵn một vài dữ liệu mẫu để biểu đồ không bị trống lúc mới load
 myGraph.addNode("A", "A", 100, 150);
 myGraph.addNode("B", "B", 300, 50);
 myGraph.addNode("C", "C", 300, 250);
 myGraph.addNode("D", "D", 500, 150);
 nextNodeIndex.value = 4;
+
+// Khởi tạo layouts cho các node ban đầu
+layouts.nodes.A = { x: 100, y: 150 };
+layouts.nodes.B = { x: 300, y: 50 };
+layouts.nodes.C = { x: 300, y: 250 };
+layouts.nodes.D = { x: 500, y: 150 };
 
 myGraph.addEdge("e1", "A", "B", 4);
 myGraph.addEdge("e2", "A", "C", 2);
@@ -107,28 +119,31 @@ const handleAddNode = (id) => {
      const randomX = Math.random() * 400 + 50;
      const randomY = Math.random() * 400 + 50;
      myGraph.addNode(id, id, randomX, randomY);
+     // ⭐ Cập nhật layouts
+     layouts.nodes[id] = { x: randomX, y: randomY };
    }
 };
 
-// Hàm tạo đỉnh mới từ double-click trên canvas
+// Hàm tạo đỉnh mới từ shift+click trên canvas
 const handleCreateNodeFromCanvas = (coords) => {
   // Sinh tên đỉnh tự động
   const nodeName = myGraph.generateNodeName(nextNodeIndex.value);
   
-  // coords.x, coords.y là tọa độ SVG từ GraphCanvas (đã transform từ viewport coords)
-  // Sử dụng trực tiếp tọa độ SVG để node nằm đúng tại vị trí click
-  let nodeX = Math.round(coords.x);
-  let nodeY = Math.round(coords.y);
+  // coords.x, coords.y là tọa độ SVG đã được translate từ DOM
+  const nodeX = Math.round(coords.x);
+  const nodeY = Math.round(coords.y);
   
+  // Thêm node vào graph
   myGraph.addNode(nodeName, nodeName, nodeX, nodeY);
   
-  // KHÔNG cố định vị trí - cho phép ForceLayout tự dàn trang nó
-  // myGraph.fixNodePosition(nodeName);
+  // ⭐ QUAN TRỌNG: Cập nhật layouts với fixed: true để giữ vị trí tại click point
+  // fixed: true ngăn ForceLayout dịch chuyển node từ vị trí gốc
+  layouts.nodes[nodeName] = { x: nodeX, y: nodeY, fixed: true };
   
   // Tăng chỉ số đỉnh tiếp theo
   nextNodeIndex.value++;
   
-  console.log(`New node created: ${nodeName} at SVG coords (${nodeX}, ${nodeY})`);
+  console.log(`New node created: ${nodeName} at SVG coordinates (${nodeX}, ${nodeY})`);
 };
 
 const handleAddEdge = (e) => {

@@ -2,12 +2,12 @@
   "name": "dijkstra-app",
   "version": "1.0.0",
   "description": "",
-  "main": "main.js",
+  "main": "dist-electron/main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "electron .",
     "dev": "concurrently \"vite\" \"electron .\"",
-    "build": "vite build"
+    "build": "vite build && electron-builder"
   },
   "author": "",
   "license": "ISC",
@@ -15,7 +15,9 @@
     "@vitejs/plugin-vue": "^6.0.4",
     "concurrently": "^9.2.1",
     "electron": "^40.2.1",
-    "vite": "^7.3.1"
+    "electron-builder": "^26.8.1",
+    "vite": "^7.3.1",
+    "vite-plugin-electron": "^0.29.1"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.2.0",
@@ -25,5 +27,25 @@
     "popper.js": "^1.16.1",
     "v-network-graph": "^0.9.22",
     "vue": "^3.5.27"
+  },
+  "build": {
+    "appId": "com.dijkstra.app",
+    "productName": "Dijkstra App",
+    "directories": {
+      "output": "release/"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }
