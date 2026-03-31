@@ -57,40 +57,34 @@ const props = defineProps({
 
 const emit = defineEmits(['create-node']);
 
-// Reference to v-network-graph instance
+// Reference đến instance của v-network-graph để gọi các hàm API bên trong
 const graphRef = ref(null);
 
-// Event handlers - tap into v-network-graph events
+// Xử lý các sự kiện tương tác
 const eventHandlers = {
   "view:click": (payload) => {
-    // Extract the actual MouseEvent from payload
+    // Trích xuất MouseEvent (tùy thuộc vào phiên bản v-network-graph, payload có thể bọc event ở trong)
     const mouseEvent = payload.event || payload;
     
-    // Check if shift key was pressed
+    // Chỉ xử lý khi người dùng giữ phím Shift
     if (!mouseEvent.shiftKey) return;
 
     if (!graphRef.value) return;
 
-    // 1. Get DOM coordinates from mouse event (relative to viewport)
+    // 1. Lấy tọa độ click trên màn hình trình duyệt (DOM point)
     const domPoint = { x: mouseEvent.clientX, y: mouseEvent.clientY };
     
-    // 2. Translate DOM coordinates to SVG graph coordinates
-    // This accounts for pan, zoom, and view transformations
+    // 2. Chuyển đổi DOM point sang hệ tọa độ thực tế của đồ thị SVG (đã tính toán zoom/pan)
     const svgPoint = graphRef.value.translateFromDomToSvgCoordinates(domPoint);
 
-    if (!svgPoint) {
-      console.warn('Failed to translate coordinates');
-      return;
-    }
+    console.log(`Đã tính toán tọa độ SVG: x=${svgPoint.x}, y=${svgPoint.y}`);
 
-    console.log(`Creating node at SVG coordinates: x=${svgPoint.x.toFixed(2)}, y=${svgPoint.y.toFixed(2)}`);
-
-    // Emit the event with properly translated graph coordinates
+    // Phát sự kiện lên component cha (App.vue) cùng với tọa độ chuẩn
     emit('create-node', { x: svgPoint.x, y: svgPoint.y });
   }
 };
 
-// Build configs from props
+// Khởi tạo cấu hình cho đồ thị
 const createConfigs = () => {
   const cfg = props.graphConfig || {};
   return {
@@ -161,7 +155,7 @@ const createConfigs = () => {
 
 const configs = reactive(createConfigs());
 
-// Watch graphConfig changes and update configs
+// Theo dõi thay đổi từ graphConfig để cập nhật lại cấu hình
 watch(
   () => props.graphConfig,
   (newConfig) => {
@@ -171,7 +165,7 @@ watch(
   { deep: true }
 );
 
-// Compute path visualization data
+// Tính toán dữ liệu đường đi (để highlight thuật toán)
 const pathData = computed(() => {
   if (!props.pathIds || props.pathIds.length === 0) {
     return {};
