@@ -13,6 +13,8 @@
         :configs="configs"
         :paths="pathData"
         :event-handlers="eventHandlers"
+        v-model:selected-nodes="selectedNodesModel"
+        v-model:selected-edges="selectedEdgesModel"
       >
         <template #edge-label="{ edge, ...slotProps }">
           <v-edge-label
@@ -65,10 +67,29 @@ const props = defineProps({
   graphConfig: {
     type: Object,
     default: () => ({})
+  },
+  selectedNodes: {
+    type: Array,
+    default: () => []
+  },
+  selectedEdges: {
+    type: Array,
+    default: () => []
   }
 });
 
-const emit = defineEmits(['create-node', 'create-edge']);
+const emit = defineEmits(['create-node', 'create-edge', 'update:selectedNodes', 'update:selectedEdges']);
+
+// Tạo computed để đồng bộ v-model hai chiều với component cha (App.vue)
+const selectedNodesModel = computed({
+  get: () => props.selectedNodes,
+  set: (val) => emit('update:selectedNodes', val)
+});
+
+const selectedEdgesModel = computed({
+  get: () => props.selectedEdges,
+  set: (val) => emit('update:selectedEdges', val)
+});
 
 // Reference đến instance của v-network-graph để gọi các hàm API bên trong
 const graphRef = ref(null);

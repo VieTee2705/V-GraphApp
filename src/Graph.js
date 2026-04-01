@@ -59,6 +59,32 @@ class Graph {
   }
 
   /**
+   * Xóa một cạnh khỏi đồ thị
+   */
+  removeEdge(edgeId) {
+    if (this.edges[edgeId]) {
+      delete this.edges[edgeId];
+    }
+  }
+
+  /**
+   * Xóa một đỉnh khỏi đồ thị và dọn dẹp các cạnh liên quan
+   */
+  removeNode(nodeId) {
+    if (this.nodes[nodeId]) {
+      // 1. Tìm và xóa tất cả các cạnh nối với đỉnh này
+      for (const edgeId in this.edges) {
+        const edge = this.edges[edgeId];
+        if (edge.source === nodeId || edge.target === nodeId) {
+          delete this.edges[edgeId];
+        }
+      }
+      // 2. Xóa đỉnh
+      delete this.nodes[nodeId];
+    }
+  }
+
+  /**
    * Cố định vị trí của một đỉnh (ngăn nó trôi do lực layout)
    * @param {string} nodeId - ID của đỉnh
    */

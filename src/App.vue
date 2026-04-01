@@ -22,6 +22,8 @@
             :layouts="layouts"
             :path-ids="result.pathEdges"
             :graph-config="graphConfig"
+            v-model:selectedNodes="selectedNodes"
+            v-model:selectedEdges="selectedEdges"
             @create-node="handleCreateNodeFromCanvas"
             @create-edge="handleCreateEdgeFromCanvas"
           />
@@ -53,6 +55,7 @@ import GraphCanvas from './components/GraphCanvas.vue';
 import AnotherSet from './components/AnotherSet.vue';
 import NavBar from './components/NavBar.vue';
 import { Graph } from './Graph.js'; 
+import { onMounted, onUnmounted } from 'vue';
 
 // Khởi tạo đối tượng đồ thị thực sự từ class và bọc trong reactive
 const myGraph = reactive(new Graph());
@@ -86,6 +89,10 @@ myGraph.addEdge("e5", "C", "D", 3);
 
 // Trạng thái của điểm bắt đầu, điểm kết thúc
 const search = reactive({ start: "A", end: "D" });
+
+// State lưu trữ các đỉnh và cạnh đang được click chọn trên Canvas
+const selectedNodes = ref([]);
+const selectedEdges = ref([]);
 
 // Graph config state
 const graphConfig = reactive({
@@ -170,6 +177,49 @@ const handleUpdateGraphConfig = (newConfig) => {
   Object.assign(graphConfig, newConfig);
   console.log("Graph config updated:", graphConfig);
 };
+
+// --- LẮNG NGHE SỰ KIỆN XÓA (DELETE / BACKSPACE) ---
+const handleDeleteKey = (e) => {
+  // Tránh việc vô tình xóa đồ thị khi người dùng đang gõ text vào các form input
+  const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+  if (activeTag === 'input' || activeTag === 'textarea') return;
+
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    let hasChanges = false;
+
+    // Xóa cạnh
+    if (selectedEdges.value.length > 0) {
+      selectedEdges.value.forEach(edgeId => myGraph.removeEdge(edgeId));
+      selectedEdges.value = []; // Xóa khỏi danh sách chọn
+      hasChanges = true;
+    }
+
+    // Xóa đỉnh
+    if (selectedNodes.value.length > 0) {
+      selectedNodes.value.forEach(nodeId => {
+        myGraph.removeNode(nodeId);
+        delete layouts.nodes[nodeId]; // Đồng thời xóa dữ liệu tọa độ
+      });
+      selectedNodes.value = []; // Xóa khỏi danh sách chọn
+      hasChanges = true;
+    }
+
+    // Nếu có đỉnh/cạnh bị xóa, reset lại đường đi Dijkstra (nếu đang chạy)
+    if (hasChanges) {
+      isRun.value = false;
+      console.log('Đã xóa các phần tử được chọn.');
+    }
+  }
+};
+
+// Gắn sự kiện lắng nghe bàn phím khi App được mount
+onMounted(() => {
+  window.addEventListener('keydown', handleDeleteKey);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleDeleteKey);
+});
 
 // Reset thuật toán khi đổi điểm bắt đầu hoặc kết thúc
 watch(() => [search.start, search.end], () => {
