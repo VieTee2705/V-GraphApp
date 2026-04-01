@@ -2,9 +2,9 @@
   <div class="card-component graph-card">
     <div class="card-header-component d-flex justify-content-between align-items-center">
       <span><i class="fas fa-network-wired me-2"></i>Trực Quan Hóa Đồ Thị</span>
-      <span class="badge bg-white text-primary border border-primary">Shift + Click để thêm đỉnh</span>
+      <span class="badge bg-white text-primary border border-primary">Shift + Click để thêm đỉnh / Nối cạnh</span>
     </div>
-    <div class="card-body p-0 graph-wrapper">
+    <div class="card-body p-0 graph-wrapper position-relative">
       <v-network-graph
         ref="graphRef"
         :nodes="nodes"
@@ -24,12 +24,25 @@
           />
         </template>
       </v-network-graph>
+
+      <!-- Floating input for Edge weight -->
+      <div v-if="showWeightInput" class="weight-input-overlay" :style="{ left: inputPos.x + 'px', top: inputPos.y + 'px' }">
+        <input 
+          ref="weightInputRef"
+          type="number" 
+          v-model.number="weightInputValue" 
+          @keyup.enter="confirmEdge"
+          @keyup.esc="cancelEdge"
+          class="weight-input"
+        />
+        <span class="weight-hint">Enter để lưu</span>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { reactive, computed, ref, watch } from 'vue';
+import { reactive, computed, ref, watch, nextTick } from 'vue';
 import { ForceLayout } from 'v-network-graph/lib/force-layout';
 
 const props = defineProps({
@@ -55,24 +68,37 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['create-node']);
+const emit = defineEmits(['create-node', 'create-edge']);
 
 // Reference đến instance của v-network-graph để gọi các hàm API bên trong
 const graphRef = ref(null);
 
+// Trạng thái cho việc nối cạnh
+const selectedSourceNode = ref(null);
+const showWeightInput = ref(false);
+const inputPos = reactive({ x: 0, y: 0 });
+const pendingEdge = reactive({ source: '', target: '' });
+const weightInputValue = ref(1);
+const weightInputRef = ref(null);
+
 // Xử lý các sự kiện tương tác
 const eventHandlers = {
   "view:click": (payload) => {
-    // Trích xuất MouseEvent (tùy thuộc vào phiên bản v-network-graph, payload có thể bọc event ở trong)
     const mouseEvent = payload.event || payload;
     
+    // Hủy quá trình nối cạnh / nhập liệu nếu click ra ngoài canvas
+    if (showWeightInput.value) {
+      cancelEdge();
+      return;
+    }
+    selectedSourceNode.value = null;
+
     // Chỉ xử lý khi người dùng giữ phím Shift
     if (!mouseEvent.shiftKey) return;
 
     if (!graphRef.value) return;
 
     // 1. SỬA TẠI ĐÂY: Dùng offsetX và offsetY thay vì clientX và clientY
-    // Lấy tọa độ click trên màn hình tương đối so với container của đồ thị
     const domPoint = { x: mouseEvent.offsetX, y: mouseEvent.offsetY };
     
     // 2. Chuyển đổi DOM point sang hệ tọa độ thực tế của đồ thị SVG (đã tính toán zoom/pan)
@@ -82,7 +108,78 @@ const eventHandlers = {
 
     // Phát sự kiện lên component cha (App.vue) cùng với tọa độ chuẩn
     emit('create-node', { x: svgPoint.x, y: svgPoint.y });
+  },
+  "node:click": (payload) => {
+    const mouseEvent = payload.event || payload.event;
+    const nodeId = payload.node;
+    
+    if (showWeightInput.value) return; // Đang hiện ô nhập trọng số thì bỏ qua
+
+    // Chỉ xử lý khi giữ phím Shift
+    if (!mouseEvent.shiftKey) {
+        selectedSourceNode.value = null;
+        return;
+    }
+
+    if (!selectedSourceNode.value) {
+      // Lần Shift+Click đầu tiên: Chọn đỉnh nguồn
+      selectedSourceNode.value = nodeId;
+    } else {
+      // Lần Shift+Click thứ hai: Chọn đỉnh đích
+      if (selectedSourceNode.value === nodeId) return; // Click trùng đỉnh cũ
+      
+      pendingEdge.source = selectedSourceNode.value;
+      pendingEdge.target = nodeId;
+      
+      // Lấy tọa độ SVG của 2 đỉnh để tính trung điểm
+      const sNode = props.layouts.nodes[pendingEdge.source];
+      const tNode = props.layouts.nodes[pendingEdge.target];
+      const svgMid = {
+        x: (sNode.x + tNode.x) / 2,
+        y: (sNode.y + tNode.y) / 2
+      };
+      
+      // Chuyển trung điểm về tọa độ DOM để đặt ô Input nổi
+      const domMid = graphRef.value.translateFromSvgToDomCoordinates(svgMid);
+      inputPos.x = domMid.x;
+      inputPos.y = domMid.y;
+      
+      weightInputValue.value = 1; // Reset trọng số mặc định
+      showWeightInput.value = true;
+      
+      // Tự động focus vào ô input
+      nextTick(() => {
+        if (weightInputRef.value) weightInputRef.value.focus();
+      });
+      
+      selectedSourceNode.value = null; // Xóa chọn nguồn để sẵn sàng cho lần sau
+    }
   }
+};
+
+const confirmEdge = () => {
+  console.log(`[GraphCanvas] Chuẩn bị thêm cạnh: ${pendingEdge.source} -> ${pendingEdge.target} | Trọng số: ${weightInputValue.value}`);
+  
+  if (pendingEdge.source && pendingEdge.target) {
+    const edgeData = {
+      source: pendingEdge.source,
+      target: pendingEdge.target,
+      weight: Number(weightInputValue.value) || 0
+    };
+    
+    console.log('[GraphCanvas] Emit sự kiện create-edge với payload:', edgeData);
+    emit('create-edge', edgeData);
+  } else {
+    console.warn('[GraphCanvas] Cảnh báo: Thiếu đỉnh source hoặc target khi thêm cạnh!', pendingEdge);
+  }
+  
+  cancelEdge();
+};
+
+const cancelEdge = () => {
+  showWeightInput.value = false;
+  pendingEdge.source = '';
+  pendingEdge.target = '';
 };
 
 // Khởi tạo cấu hình cho đồ thị
@@ -115,9 +212,9 @@ const createConfigs = () => {
       selectable: true,
       normal: {
         radius: cfg.nodeRadius || 25,
-        color: cfg.nodeColor || '#E1EFFF',
+        color: node => node.id === selectedSourceNode.value ? '#ffc107' : (cfg.nodeColor || '#E1EFFF'),
         strokeWidth: 3,
-        strokeColor: cfg.nodeStrokeColor || '#0056B3'
+        strokeColor: node => node.id === selectedSourceNode.value ? '#d39e00' : (cfg.nodeStrokeColor || '#0056B3')
       },
       hover: {
         color: cfg.nodeHoverColor || '#0056B3'
@@ -155,6 +252,12 @@ const createConfigs = () => {
 };
 
 const configs = reactive(createConfigs());
+
+// Ép đồ thị vẽ lại khi chọn đỉnh nguồn để nổi bật màu đỉnh đang được chọn
+watch(selectedSourceNode, () => {
+  configs.node.normal.color = node => node.id === selectedSourceNode.value ? '#ffc107' : (props.graphConfig.nodeColor || '#E1EFFF');
+  configs.node.normal.strokeColor = node => node.id === selectedSourceNode.value ? '#d39e00' : (props.graphConfig.nodeStrokeColor || '#0056B3');
+});
 
 // Theo dõi thay đổi từ graphConfig để cập nhật lại cấu hình
 watch(
@@ -217,5 +320,48 @@ const pathData = computed(() => {
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
+}
+
+.position-relative {
+  position: relative;
+}
+
+.weight-input-overlay {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  padding: 8px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.weight-input {
+  width: 60px;
+  text-align: center;
+  font-weight: bold;
+  border: 2px solid var(--primary-color);
+  border-radius: 4px;
+  outline: none;
+  background: transparent;
+  color: var(--text-main);
+  padding: 2px;
+}
+
+.weight-input:focus {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.weight-hint {
+  font-size: 11px;
+  color: #555;
+  font-weight: 600;
 }
 </style>

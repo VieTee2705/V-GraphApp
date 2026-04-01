@@ -23,6 +23,7 @@
             :path-ids="result.pathEdges"
             :graph-config="graphConfig"
             @create-node="handleCreateNodeFromCanvas"
+            @create-edge="handleCreateEdgeFromCanvas"
           />
         </div>
         <NavBar 
@@ -130,6 +131,13 @@ const handleCreateNodeFromCanvas = (coords) => {
   nextNodeIndex.value++;
   
   console.log(`New node created: ${nodeName} at SVG coordinates (${nodeX}, ${nodeY})`);
+};
+
+// Hàm thêm cạnh mới từ canvas (Shift + Click 2 node)
+const handleCreateEdgeFromCanvas = ({ source, target, weight }) => {
+  const edgeId = `edge_${Date.now()}`;
+  myGraph.addEdge(edgeId, source, target, weight);
+  console.log(`New edge created from canvas: ${source} -> ${target} (weight: ${weight})`);
 };
 
 // Hàm thêm cạnh mới
