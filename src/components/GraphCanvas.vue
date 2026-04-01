@@ -71,8 +71,9 @@ const eventHandlers = {
 
     if (!graphRef.value) return;
 
-    // 1. Lấy tọa độ click trên màn hình trình duyệt (DOM point)
-    const domPoint = { x: mouseEvent.clientX, y: mouseEvent.clientY };
+    // 1. SỬA TẠI ĐÂY: Dùng offsetX và offsetY thay vì clientX và clientY
+    // Lấy tọa độ click trên màn hình tương đối so với container của đồ thị
+    const domPoint = { x: mouseEvent.offsetX, y: mouseEvent.offsetY };
     
     // 2. Chuyển đổi DOM point sang hệ tọa độ thực tế của đồ thị SVG (đã tính toán zoom/pan)
     const svgPoint = graphRef.value.translateFromDomToSvgCoordinates(domPoint);
