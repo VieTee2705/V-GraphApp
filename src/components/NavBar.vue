@@ -4,6 +4,11 @@
       <i class="fas fa-play me-1"></i> RUN
     </button>
 
+    <!-- Nút xóa toàn bộ đồ thị -->
+    <button class="btn-clear me-auto" @click="$emit('delete-all')" title="Xóa toàn bộ đồ thị">
+      <i class="fas fa-trash-alt me-1"></i> CLEAR ALL
+    </button>
+
     <div class="counter-control d-flex align-items-center">
       <button class="btn-step" @click="decrease">
         <i class="fas fa-minus"></i>
@@ -26,7 +31,8 @@ defineProps({
   end: String
 })
 
-defineEmits(['run-algorithm'])
+// Khai báo thêm sự kiện delete-all
+defineEmits(['run-algorithm', 'delete-all'])
 
 // Initial state value = 1
 const value = ref(1)
@@ -65,7 +71,7 @@ const decrease = () => {
   font-weight: bold;
   height: 28px;
   line-height: 1;
-  padding: 0 5px;
+  padding: 0 8px;
   border-radius: 2px;
   display: flex;
   align-items: center;
@@ -74,6 +80,26 @@ const decrease = () => {
 
 .btn-run:hover {
   filter: brightness(1.2);
+}
+
+.btn-clear {
+  background: #dc3545;
+  color: white;
+  border: none;
+  font-size: 9px;
+  font-weight: bold;
+  height: 28px;
+  line-height: 1;
+  padding: 0 8px;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.btn-clear:hover {
+  background: #c82333;
 }
 
 .counter-control {
@@ -109,6 +135,6 @@ const decrease = () => {
 
 /* Tinh chỉnh Font Awesome icon */
 .fas {
-  font-size: 15px;
+  font-size: 13px;
 }
 </style>

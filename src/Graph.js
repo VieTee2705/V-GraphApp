@@ -93,7 +93,46 @@ class Graph {
       this.nodes[nodeId].fixed = true;
     }
   }
+  getConnectedComponents() {
+    const visited = new Set();
+    const components = [];
+    const nodeIds = Object.keys(this.nodes);
 
+    for (const startNodeId of nodeIds) {
+      // Nếu đỉnh này chưa được duyệt qua, nó thuộc về một bộ phận liên thông mới
+      if (!visited.has(startNodeId)) {
+        const currentComponent = [];
+        const queue = [startNodeId];
+        visited.add(startNodeId);
+
+        // Bắt đầu BFS để quét tất cả các đỉnh kết nối với startNodeId
+        while (queue.length > 0) {
+          const currNodeId = queue.shift();
+          currentComponent.push(currNodeId);
+
+          // Tìm các đỉnh kề với currNodeId thông qua danh sách các cạnh
+          for (const edgeId in this.edges) {
+            const edge = this.edges[edgeId];
+            let neighborId = null;
+
+            if (edge.source === currNodeId) neighborId = edge.target;
+            else if (edge.target === currNodeId) neighborId = edge.source;
+
+            // Nếu kề và chưa từng được thăm thì đưa vào queue
+            if (neighborId && !visited.has(neighborId)) {
+              visited.add(neighborId);
+              queue.push(neighborId);
+            }
+          }
+        }
+
+        // Thêm cụm vừa quét xong vào danh sách tổng
+        components.push(currentComponent);
+      }
+    }
+
+    return components;
+  }
   /**
    * Thuật toán Dijkstra cho đồ thị vô hướng
    * @param {string} startNodeId - ID đỉnh bắt đầu
