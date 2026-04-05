@@ -48,6 +48,32 @@ class Graph {
     return firstChar + secondChar; // AA, AB, AC, ...
   }
 
+  /**
+   * Tìm chỉ số node tiếp theo chưa sử dụng
+   * Dịch vụ này quét tất cả node hiện tại để tìm chỉ số cao nhất
+   * @returns {number} Chỉ số node tiếp theo
+   */
+  getNextNodeIndex() {
+    let maxIndex = -1;
+
+    for (const nodeId of Object.keys(this.nodes)) {
+      // Nếu nodeId là một chữ cái (A-Z)
+      if (nodeId.length === 1 && nodeId >= "A" && nodeId <= "Z") {
+        const index = nodeId.charCodeAt(0) - 65; // A=0, B=1, ..., Z=25
+        maxIndex = Math.max(maxIndex, index);
+      }
+      // Nếu nodeId là hai chữ cái (AA-ZZ)
+      else if (nodeId.length === 2 && nodeId >= "AA" && nodeId <= "ZZ") {
+        const firstIndex = nodeId.charCodeAt(0) - 65 + 1; // AA=26
+        const secondIndex = nodeId.charCodeAt(1) - 65;
+        const index = 26 + (firstIndex - 1) * 26 + secondIndex;
+        maxIndex = Math.max(maxIndex, index);
+      }
+    }
+
+    return maxIndex + 1; // Trả về chỉ số tiếp theo
+  }
+
   addNode(id, name, x, y) {
     this.nodes[id] = new Node(id, name, x, y);
   }
@@ -55,6 +81,32 @@ class Graph {
   addEdge(id, source, target, weight) {
     if (this.nodes[source] && this.nodes[target]) {
       this.edges[id] = new Edge(id, source, target, weight);
+    }
+  }
+
+  /**
+   * Xóa một cạnh khỏi đồ thị
+   */
+  removeEdge(edgeId) {
+    if (this.edges[edgeId]) {
+      delete this.edges[edgeId];
+    }
+  }
+
+  /**
+   * Xóa một đỉnh khỏi đồ thị và dọn dẹp các cạnh liên quan
+   */
+  removeNode(nodeId) {
+    if (this.nodes[nodeId]) {
+      // 1. Tìm và xóa tất cả các cạnh nối với đỉnh này
+      for (const edgeId in this.edges) {
+        const edge = this.edges[edgeId];
+        if (edge.source === nodeId || edge.target === nodeId) {
+          delete this.edges[edgeId];
+        }
+      }
+      // 2. Xóa đỉnh
+      delete this.nodes[nodeId];
     }
   }
 
@@ -67,7 +119,46 @@ class Graph {
       this.nodes[nodeId].fixed = true;
     }
   }
+  getConnectedComponents() {
+    const visited = new Set();
+    const components = [];
+    const nodeIds = Object.keys(this.nodes);
 
+    for (const startNodeId of nodeIds) {
+      // Nếu đỉnh này chưa được duyệt qua, nó thuộc về một bộ phận liên thông mới
+      if (!visited.has(startNodeId)) {
+        const currentComponent = [];
+        const queue = [startNodeId];
+        visited.add(startNodeId);
+
+        // Bắt đầu BFS để quét tất cả các đỉnh kết nối với startNodeId
+        while (queue.length > 0) {
+          const currNodeId = queue.shift();
+          currentComponent.push(currNodeId);
+
+          // Tìm các đỉnh kề với currNodeId thông qua danh sách các cạnh
+          for (const edgeId in this.edges) {
+            const edge = this.edges[edgeId];
+            let neighborId = null;
+
+            if (edge.source === currNodeId) neighborId = edge.target;
+            else if (edge.target === currNodeId) neighborId = edge.source;
+
+            // Nếu kề và chưa từng được thăm thì đưa vào queue
+            if (neighborId && !visited.has(neighborId)) {
+              visited.add(neighborId);
+              queue.push(neighborId);
+            }
+          }
+        }
+
+        // Thêm cụm vừa quét xong vào danh sách tổng
+        components.push(currentComponent);
+      }
+    }
+
+    return components;
+  }
   /**
    * Thuật toán Dijkstra cho đồ thị vô hướng
    * @param {string} startNodeId - ID đỉnh bắt đầu

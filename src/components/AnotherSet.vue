@@ -1,6 +1,7 @@
 <template>
-  <div class="container-fluid h-100 d-flex flex-column p-0 settings-container">
-    <ul class="nav nav-pills mb-2 px-3 pt-3" id="pills-tab" role="tablist">
+  <div class="container-fluid h-100 d-flex flex-column p-0 settings-container overflow-hidden" style="min-height: 0;">
+    
+    <ul class="nav nav-pills mb-2 px-3 pt-3 flex-shrink-0" id="pills-tab" role="tablist">
       <li class="nav-item" v-for="tab in tabs" :key="tab.id">
         <button 
           class="nav-link nav-link-sm" 
@@ -13,8 +14,8 @@
       </li>
     </ul>
 
-    <div class="tab-content flex-grow-1 overflow-auto px-3 pb-3">
-      <!-- Path Tab -->
+    <div class="tab-content flex-grow-1 overflow-y-auto px-3 pb-3" style="min-height: 0;">
+      
       <div v-if="activeTab === 'path'" class="tab-pane fade show active">
         <ResultView 
             :path="result.path"
@@ -24,7 +25,6 @@
         />
       </div>
 
-      <!-- Guidance Tab -->
       <div v-if="activeTab === 'guidance'" class="tab-pane fade show active">
         <h5 class="fw-bold mb-3" style="color: var(--primary-color)">📖 Hướng Dẫn Sử Dụng</h5>
         <div class="guidance-content">
@@ -74,11 +74,10 @@
         </div>
       </div>
 
-      <!-- Settings Tab -->
       <div v-if="activeTab === 'settings'" class="tab-pane fade show active">
         <h5 class="fw-bold mb-3" style="color: var(--primary-color)">⚙️ Cài Đặt Đồ Thị</h5>
-        <div class="settings-content overflow-auto">
-          <!-- Force Layout Settings -->
+        
+        <div class="settings-content">
           <div class="setting-section mb-4">
             <h6 class="fw-bold text-main mb-2">📏 Lực Bố Cục (Force Layout)</h6>
             
@@ -130,7 +129,6 @@
             </div>
           </div>
 
-          <!-- Node Settings -->
           <div class="setting-section mb-4">
             <h6 class="fw-bold text-main mb-2">⭕ Cấu Hình Nút (Node)</h6>
             
@@ -169,7 +167,6 @@
             </div>
           </div>
 
-          <!-- Edge Settings -->
           <div class="setting-section mb-4">
             <h6 class="fw-bold text-main mb-2">━ Cấu Hình Cạnh (Edge)</h6>
             
@@ -212,7 +209,6 @@
             </div>
           </div>
 
-          <!-- Path Settings -->
           <div class="setting-section">
             <h6 class="fw-bold text-main mb-2">✨ Cấu Hình Đường Đi (Path)</h6>
             
@@ -317,12 +313,17 @@ const resetSettings = () => {
   background-color: var(--bg-color);
   border-radius: 12px;
   border: 1px solid var(--border-color);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .nav-link-sm {
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
   color: var(--text-main);
+  flex-shrink: 0;
 }
 
 .nav-link-sm.active {
@@ -332,25 +333,39 @@ const resetSettings = () => {
 
 .tab-content {
   background-color: var(--bg-color);
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-pane {
+  padding: 0.5rem 0;
 }
 
 .guidance-content {
   padding: 0.5rem 0;
+  overflow: hidden;
 }
 
 .guide-section {
   line-height: 1.6;
+  margin-bottom: 0.75rem;
 }
 
 .guide-section h6 {
   color: var(--text-main);
   margin-bottom: 0.5rem;
+  font-size: 0.9rem;
 }
 
 .alert-small {
   padding: 0.5rem 0.75rem;
   margin-bottom: 0.5rem;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  border-radius: 4px;
 }
 
 .alert-info.alert-small {
@@ -360,7 +375,8 @@ const resetSettings = () => {
 }
 
 .settings-content {
-  max-height: calc(100vh - 300px);
+  padding: 0;
+  overflow: hidden;
 }
 
 .setting-section {
@@ -368,6 +384,7 @@ const resetSettings = () => {
   background-color: #f8f9fa;
   border-radius: 8px;
   border-left: 3px solid var(--primary-color);
+  margin-bottom: 0.75rem;
 }
 
 .setting-section h6 {
