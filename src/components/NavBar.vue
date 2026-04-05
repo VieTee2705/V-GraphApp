@@ -9,6 +9,11 @@
       <i class="fas fa-trash-alt me-1"></i> CLEAR ALL
     </button>
 
+    <!-- Nút xuất file SVG -->
+    <button class="btn-export ms-2 me-auto" @click="$emit('export-svg')" title="Xuất ảnh đồ thị SVG">
+      <i class="fas fa-download me-1"></i> EXPORT SVG
+    </button>
+
     <div class="counter-control d-flex align-items-center">
       <button class="btn-step" @click="decrease">
         <i class="fas fa-minus"></i>
@@ -31,8 +36,8 @@ defineProps({
   end: String
 })
 
-// Khai báo thêm sự kiện delete-all
-defineEmits(['run-algorithm', 'delete-all'])
+// Khai báo thêm sự kiện delete-all và export-svg
+defineEmits(['run-algorithm', 'delete-all', 'export-svg'])
 
 // Initial state value = 1
 const value = ref(1)
@@ -100,6 +105,26 @@ const decrease = () => {
 
 .btn-clear:hover {
   background: #c82333;
+}
+
+.btn-export {
+  background: #28a745;
+  color: white;
+  border: none;
+  font-size: 9px;
+  font-weight: bold;
+  height: 28px;
+  line-height: 1;
+  padding: 0 8px;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.btn-export:hover {
+  background: #218838;
 }
 
 .counter-control {

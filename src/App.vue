@@ -70,7 +70,7 @@
         <AnotherSet
           :result="result"
           :start="search.start"
-          :end="search.end"
+          :end="search.end"WS
           :graph-config="graphConfig"
           @update-config="handleUpdateGraphConfig"
         />
@@ -115,23 +115,23 @@ const layouts = reactive({
 const selectedNodes = ref([]);
 const selectedEdges = ref([]);
 
-// Thêm sẵn một vài dữ liệu mẫu
-myGraph.addNode("A", "A", 100, 150);
-myGraph.addNode("B", "B", 300, 50);
-myGraph.addNode("C", "C", 300, 250);
-myGraph.addNode("D", "D", 500, 150);
-nextNodeIndex.value = 4;
+// // Thêm sẵn một vài dữ liệu mẫu
+// myGraph.addNode("A", "A", 100, 150);
+// myGraph.addNode("B", "B", 300, 50);
+// myGraph.addNode("C", "C", 300, 250);
+// myGraph.addNode("D", "D", 500, 150);
+// nextNodeIndex.value = 4;
 
-layouts.nodes.A = { x: 100, y: 150 };
-layouts.nodes.B = { x: 300, y: 50 };
-layouts.nodes.C = { x: 300, y: 250 };
-layouts.nodes.D = { x: 500, y: 150 };
+// layouts.nodes.A = { x: 100, y: 150 };
+// layouts.nodes.B = { x: 300, y: 50 };
+// layouts.nodes.C = { x: 300, y: 250 };
+// layouts.nodes.D = { x: 500, y: 150 };
 
-myGraph.addEdge("e1", "A", "B", 4);
-myGraph.addEdge("e2", "A", "C", 2);
-myGraph.addEdge("e3", "B", "C", 5);
-myGraph.addEdge("e4", "B", "D", 10);
-myGraph.addEdge("e5", "C", "D", 3);
+// myGraph.addEdge("e1", "A", "B", 4);
+// myGraph.addEdge("e2", "A", "C", 2);
+// myGraph.addEdge("e3", "B", "C", 5);
+// myGraph.addEdge("e4", "B", "D", 10);
+// myGraph.addEdge("e5", "C", "D", 3);
 
 // Trạng thái của điểm bắt đầu, điểm kết thúc
 const search = reactive({ start: "A", end: "D" });
@@ -158,6 +158,8 @@ const handleAddNode = (id) => {
      const randomY = Math.random() * 400 + 50;
      myGraph.addNode(id, id, randomX, randomY);
      layouts.nodes[id] = { x: randomX, y: randomY };
+     // Cập nhật nextNodeIndex để tránh trùng tên
+     nextNodeIndex.value = myGraph.getNextNodeIndex();
    }
 };
 
@@ -169,7 +171,9 @@ const handleCreateNodeFromCanvas = (coords) => {
   
   myGraph.addNode(nodeName, nodeName, nodeX, nodeY);
   layouts.nodes[nodeName] = { x: nodeX, y: nodeY, fixed: true };
-  nextNodeIndex.value++;
+  
+  // Cập nhật nextNodeIndex để tránh trùng tên
+  nextNodeIndex.value = myGraph.getNextNodeIndex();
 };
 
 // Hàm thêm cạnh mới từ canvas (Shift + Click 2 node)
@@ -193,6 +197,8 @@ const handleImportGraph = (graphData) => {
     const edgeId = `edge_${edge.s}_${edge.t}_${index}`;
     myGraph.addEdge(edgeId, edge.s, edge.t, edge.w);
   });
+  // Cập nhật nextNodeIndex sau khi import
+  nextNodeIndex.value = myGraph.getNextNodeIndex();
 };
 
 // Biến trạng thái chạy thuật toán
@@ -255,6 +261,8 @@ const handleDeleteKey = (e) => {
 
     if (hasChanges) {
       isRun.value = false;
+      // Cập nhật nextNodeIndex khi xóa node
+      nextNodeIndex.value = myGraph.getNextNodeIndex();
     }
   }
 };
@@ -396,6 +404,12 @@ html, body, #app {
   transition: width 0.3s ease-in-out;
 }
 
+.row.flex-grow-1 {
+  min-height: 0;
+  height: 100%;
+  display: flex;
+}
+
 .slide-in-right {
   animation: slideInRight 0.3s forwards;
 }
@@ -418,6 +432,8 @@ html, body, #app {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  height: 100%;
 }
 
 .app-input-panel {

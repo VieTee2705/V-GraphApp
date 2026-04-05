@@ -301,6 +301,40 @@ const pathData = computed(() => {
     }
   };
 });
+
+// SVG export
+
+// Hàm xuất ảnh SVG
+const exportAsSvg = async () => {
+  if (!graphRef.value) return;
+  try {
+    // v-network-graph cung cấp hàm getAsSvg() trả về Promise chứa string SVG
+    const svgText = await graphRef.value.getAsSvg();
+    
+    // Tạo Blob từ chuỗi SVG
+    const blob = new Blob([svgText], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    
+    // Tạo thẻ <a> ẩn để kích hoạt tải xuống
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `graph_${Date.now()}.svg`; // Tên file có kèm timestamp
+    document.body.appendChild(a);
+    a.click();
+    
+    // Dọn dẹp
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    console.log("Xuất file SVG thành công!");
+  } catch (error) {
+    console.error("Lỗi khi xuất SVG:", error);
+  }
+};
+
+// Expose hàm ra ngoài để App.vue có thể gọi thông qua template ref
+defineExpose({
+  exportAsSvg
+});
 </script>
 
 <style scoped>

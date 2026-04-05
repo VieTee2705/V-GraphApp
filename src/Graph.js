@@ -48,6 +48,32 @@ class Graph {
     return firstChar + secondChar; // AA, AB, AC, ...
   }
 
+  /**
+   * Tìm chỉ số node tiếp theo chưa sử dụng
+   * Dịch vụ này quét tất cả node hiện tại để tìm chỉ số cao nhất
+   * @returns {number} Chỉ số node tiếp theo
+   */
+  getNextNodeIndex() {
+    let maxIndex = -1;
+
+    for (const nodeId of Object.keys(this.nodes)) {
+      // Nếu nodeId là một chữ cái (A-Z)
+      if (nodeId.length === 1 && nodeId >= "A" && nodeId <= "Z") {
+        const index = nodeId.charCodeAt(0) - 65; // A=0, B=1, ..., Z=25
+        maxIndex = Math.max(maxIndex, index);
+      }
+      // Nếu nodeId là hai chữ cái (AA-ZZ)
+      else if (nodeId.length === 2 && nodeId >= "AA" && nodeId <= "ZZ") {
+        const firstIndex = nodeId.charCodeAt(0) - 65 + 1; // AA=26
+        const secondIndex = nodeId.charCodeAt(1) - 65;
+        const index = 26 + (firstIndex - 1) * 26 + secondIndex;
+        maxIndex = Math.max(maxIndex, index);
+      }
+    }
+
+    return maxIndex + 1; // Trả về chỉ số tiếp theo
+  }
+
   addNode(id, name, x, y) {
     this.nodes[id] = new Node(id, name, x, y);
   }
