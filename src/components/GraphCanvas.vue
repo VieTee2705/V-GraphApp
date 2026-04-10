@@ -75,6 +75,10 @@ const props = defineProps({
   selectedEdges: {
     type: Array,
     default: () => []
+  },
+  isDirected: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -252,6 +256,14 @@ const createConfigs = () => {
         color: cfg.edgeColor || '#cccccc',
         width: cfg.edgeWidth || 3
       },
+      marker: {
+        target: {
+          type: props.isDirected ? 'arrow' : 'none',
+          width: 5,
+          height: 5,
+          margin: -1
+        }
+      },
       label: {
         fontSize: 13,
         color: '#1A1A1B',
@@ -280,6 +292,13 @@ watch(selectedSourceNode, () => {
   configs.node.normal.strokeColor = node => node.id === selectedSourceNode.value ? '#d39e00' : (props.graphConfig.nodeStrokeColor || '#0056B3');
 });
 
+// Watch isDirected để cập nhật mũi tên marker
+watch(() => props.isDirected, (newVal) => {
+  if (configs.edge && configs.edge.marker) {
+    configs.edge.marker.target.type = newVal ? 'arrow' : 'none';
+  }
+});
+
 // Theo dõi thay đổi từ graphConfig để cập nhật lại cấu hình
 watch(
   () => props.graphConfig,
@@ -301,39 +320,102 @@ const pathData = computed(() => {
     }
   };
 });
+// --- XUẤT ẢNH (SVG, PNG, JPEG) ---
 
-// SVG export
+// Hàm hỗ trợ tải file
+const downloadFile = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 
-// Hàm xuất ảnh SVG
-const exportAsSvg = async () => {
+// Hàm xuất đồ thị tổng quát
+const exportGraph = async (format) => {
   if (!graphRef.value) return;
   try {
-    // v-network-graph cung cấp hàm getAsSvg() trả về Promise chứa string SVG
     const svgText = await graphRef.value.getAsSvg();
     
-    // Tạo Blob từ chuỗi SVG
-    const blob = new Blob([svgText], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
+    // 1. Xuất SVG truyền thống
+    if (format === 'svg') {
+      const blob = new Blob([svgText], { type: 'image/svg+xml' });
+      downloadFile(blob, `graph_${Date.now()}.svg`);
+      console.log("Xuất file SVG thành công!");
+      return;
+    }
+
+    // 2. Xuất PNG / JPEG thông qua HTML Canvas
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
+    const svgElement = svgDoc.documentElement;
     
-    // Tạo thẻ <a> ẩn để kích hoạt tải xuống
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `graph_${Date.now()}.svg`; // Tên file có kèm timestamp
-    document.body.appendChild(a);
-    a.click();
+    // Cố gắng tính toán lại kích thước nếu SVG không quy định rõ width/height
+    let width = parseFloat(svgElement.getAttribute("width"));
+    let height = parseFloat(svgElement.getAttribute("height"));
     
-    // Dọn dẹp
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    console.log("Xuất file SVG thành công!");
+    if (!width || !height) {
+      const viewBox = svgElement.getAttribute("viewBox");
+      if (viewBox) {
+        const vbParts = viewBox.split(" ");
+        width = parseFloat(vbParts[2]);
+        height = parseFloat(vbParts[3]);
+        svgElement.setAttribute("width", width);
+        svgElement.setAttribute("height", height);
+      } else {
+        width = 800; // Giá trị fallback mặc định
+        height = 600;
+      }
+    }
+
+    // Serialize lại đoạn SVG đã có width/height chuẩn
+    const serializer = new XMLSerializer();
+    const updatedSvgText = serializer.serializeToString(svgElement);
+    
+    // Tạo đối tượng canvas
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+
+    // JPEG không hỗ trợ trong suốt, cần fill nền (thường là nền trắng)
+    if (format === 'jpeg') {
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    // Load SVG vào đối tượng Image
+    const img = new Image();
+    const svgBlob = new Blob([updatedSvgText], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    img.onload = () => {
+      // Vẽ image chứa SVG lên Canvas
+      ctx.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url); // Giải phóng memory
+      
+      // Xuất Canvas ra file Blob
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const ext = format === 'jpeg' ? 'jpg' : 'png';
+          downloadFile(blob, `graph_${Date.now()}.${ext}`);
+          console.log(`Xuất file ${ext.toUpperCase()} thành công!`);
+        }
+      }, `image/${format}`, 1.0); // Quality 1.0 cho ảnh sắc nét
+    };
+    img.src = url;
+
   } catch (error) {
-    console.error("Lỗi khi xuất SVG:", error);
+    console.error("Lỗi khi xuất đồ thị:", error);
   }
 };
 
-// Expose hàm ra ngoài để App.vue có thể gọi thông qua template ref
+// Cập nhật lại Expose ra ngoài để App.vue gọi được
 defineExpose({
-  exportAsSvg
+  exportGraph
 });
 </script>
 

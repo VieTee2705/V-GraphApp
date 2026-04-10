@@ -32,6 +32,7 @@ class Graph {
     // Sử dụng Object thay vì Map để Vue 3 dễ dàng theo dõi (reactivity)
     this.nodes = {};
     this.edges = {};
+    this.isDirected = false; // Cờ loại đồ thị: false = vô hướng, true = có hướng
   }
 
   /**
@@ -141,8 +142,14 @@ class Graph {
             const edge = this.edges[edgeId];
             let neighborId = null;
 
-            if (edge.source === currNodeId) neighborId = edge.target;
-            else if (edge.target === currNodeId) neighborId = edge.source;
+            // Logic điều chỉnh theo loại đồ thị:
+            // - Có hướng: chỉ đi chiều source -> target
+            // - Vô hướng: đi được cả hai chiều
+            if (edge.source === currNodeId) {
+              neighborId = edge.target; // Luôn có thể đi từ source -> target
+            } else if (!this.isDirected && edge.target === currNodeId) {
+              neighborId = edge.source; // Chỉ đi từ target -> source nếu là VÔ HƯỚNG
+            }
 
             // Nếu kề và chưa từng được thăm thì đưa vào queue
             if (neighborId && !visited.has(neighborId)) {
@@ -195,13 +202,19 @@ class Graph {
 
       visited.add(currNodeId);
 
-      // Bước 2: Duyệt qua các cạnh kề (vì là đồ thị vô hướng)
+      // Bước 2: Duyệt qua các cạnh kề
       for (const edgeId in this.edges) {
         const edge = this.edges[edgeId];
         let neighborId = null;
 
-        if (edge.source === currNodeId) neighborId = edge.target;
-        else if (edge.target === currNodeId) neighborId = edge.source;
+        // Logic điều chỉnh theo loại đồ thị:
+        // - Có hướng: chỉ đi chiều source -> target
+        // - Vô hướng: đi được cả hai chiều
+        if (edge.source === currNodeId) {
+          neighborId = edge.target; // Luôn có thể đi từ source -> target
+        } else if (!this.isDirected && edge.target === currNodeId) {
+          neighborId = edge.source; // Chỉ đi từ target -> source nếu là VÔ HƯỚNG
+        }
 
         if (neighborId && !visited.has(neighborId)) {
           const alt = distances[currNodeId] + edge.weight;
