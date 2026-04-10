@@ -44,18 +44,19 @@
       
       <!-- Graph Canvas có thể co giãn linh hoạt khi bật/tắt AnotherSet -->
       <div :class="showAnotherSet ? 'col-6' : 'col-9'" class="app-graph-panel transition-width">
-        <GraphCanvas 
-          ref="graphCanvasRef"
-          :nodes="myGraph.nodes"
-          :edges="myGraph.edges"
-          :layouts="layouts"
-          :path-ids="result.pathEdges"
-          :graph-config="graphConfig"
-          :is-directed="isDirected" v-model:selectedNodes="selectedNodes"
-          v-model:selectedEdges="selectedEdges"
-          @create-node="handleCreateNodeFromCanvas"
-          @create-edge="handleCreateEdgeFromCanvas"
-        />
+        <div class="graph-container">
+          <GraphCanvas 
+            :nodes="myGraph.nodes"
+            :edges="myGraph.edges"
+            :layouts="layouts"
+            :path-ids="result.pathEdges"
+            :graph-config="graphConfig"
+            v-model:selectedNodes="selectedNodes"
+            v-model:selectedEdges="selectedEdges"
+            @create-node="handleCreateNodeFromCanvas"
+            @create-edge="handleCreateEdgeFromCanvas"
+          />
+        </div>
         <NavBar 
           :start="search.start"
           :end="search.end"
@@ -63,6 +64,7 @@
           @run-algorithm="runAlgorithm"
           @delete-all="handleDeleteAll"
           @export-graph="handleExportGraph"
+          @fix-nodes="handleFixAllNodes"
         />
       </div>
 
@@ -71,7 +73,7 @@
         <AnotherSet
           :result="result"
           :start="search.start"
-          :end="search.end"
+          :end="search.end"WS
           :graph-config="graphConfig"
           @update-config="handleUpdateGraphConfig"
         />
@@ -89,8 +91,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
-import debounce from 'lodash/debounce'; // <-- Thêm lodash debounce
+import { reactive, ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import InputView from './components/InputView2.vue';
 import GraphCanvas from './components/GraphCanvas.vue';
 import AnotherSet from './components/AnotherSet.vue';
@@ -98,18 +99,47 @@ import NavBar from './components/NavBar.vue';
 import ConnectedComponents from './components/ConnectedComponents.vue'; 
 import { Graph } from './Graph.js'; 
 
+// Quản lý state cho Điều hướng trang
 const currentPage = ref(1);
 const showAnotherSet = ref(false);
 
+// Khởi tạo đối tượng đồ thị thực sự từ class và bọc trong reactive
 const myGraph = reactive(new Graph());
-const isDirected = ref(false); // State cho ha đồ thị có hướng/vô hướng
+
+// Theo dõi chỉ số đỉnh tiếp theo
 const nextNodeIndex = ref(0);
-const layouts = reactive({ nodes: {} });
+
+// State để quản lý tọa độ của các node
+const layouts = reactive({
+  nodes: {}
+});
+
+// State lưu trữ các đỉnh và cạnh đang được click chọn trên Canvas
 const selectedNodes = ref([]);
 const selectedEdges = ref([]);
 
+// // Thêm sẵn một vài dữ liệu mẫu
+// myGraph.addNode("A", "A", 100, 150);
+// myGraph.addNode("B", "B", 300, 50);
+// myGraph.addNode("C", "C", 300, 250);
+// myGraph.addNode("D", "D", 500, 150);
+// nextNodeIndex.value = 4;
+
+// layouts.nodes.A = { x: 100, y: 150 };
+// layouts.nodes.B = { x: 300, y: 50 };
+// layouts.nodes.C = { x: 300, y: 250 };
+// layouts.nodes.D = { x: 500, y: 150 };
+
+// myGraph.addEdge("e1", "A", "B", 4);
+// myGraph.addEdge("e2", "A", "C", 2);
+// myGraph.addEdge("e3", "B", "C", 5);
+// myGraph.addEdge("e4", "B", "D", 10);
+// myGraph.addEdge("e5", "C", "D", 3);
+
+// Trạng thái của điểm bắt đầu, điểm kết thúc
 const search = reactive({ start: "A", end: "D" });
 
+// Graph config state
 const graphConfig = reactive({
   distanceMin: 120,
   chargeStrength: -400,
@@ -124,108 +154,18 @@ const graphConfig = reactive({
   pathColor: '#0056B3'
 });
 
-const isLoaded = ref(false); // Cờ kiểm tra đã load data lần đầu chưa
-
-// --- LOGIC AUTO-SAVE & RESTORE ---
-
-// Gom nhóm dữ liệu cần lưu
-const getSaveState = () => {
-  return JSON.parse(JSON.stringify({
-    nodes: myGraph.nodes,
-    edges: myGraph.edges,
-    layouts: layouts.nodes,
-    search: { start: search.start, end: search.end },
-    graphConfig: graphConfig,
-    isDirected: isDirected.value,
-    nextNodeIndex: nextNodeIndex.value
-  }));
-};
-
-// Hàm khôi phục dữ liệu từ file
-const restoreState = (savedData) => {
-  if (!savedData) return;
-
-  // Xóa sạch graph cũ
-  Object.keys(myGraph.nodes).forEach(id => delete myGraph.nodes[id]);
-  Object.keys(myGraph.edges).forEach(id => delete myGraph.edges[id]);
-  Object.keys(layouts.nodes).forEach(id => delete layouts.nodes[id]);
-
-  // Nạp lại Nodes
-  if (savedData.nodes) {
-    Object.values(savedData.nodes).forEach(n => {
-      myGraph.addNode(n.id, n.name, n.x, n.y);
-      if (n.fixed) myGraph.fixNodePosition(n.id);
-    });
-  }
-
-  // Nạp lại Edges
-  if (savedData.edges) {
-    Object.values(savedData.edges).forEach(e => {
-      myGraph.addEdge(e.id, e.source, e.target, e.weight);
-    });
-  }
-
-  // Nạp lại Layouts (tọa độ canvas)
-  if (savedData.layouts) {
-    Object.assign(layouts.nodes, savedData.layouts);
-  }
-
-  // Nạp lại cài đặt khác
-  if (savedData.search) {
-    search.start = savedData.search.start || "";
-    search.end = savedData.search.end || "";
-  }
-  if (savedData.graphConfig) {
-    Object.assign(graphConfig, savedData.graphConfig);
-  }
-  if (savedData.isDirected !== undefined) {
-    isDirected.value = savedData.isDirected;
-    myGraph.isDirected = savedData.isDirected;
-  }
-  if (savedData.nextNodeIndex !== undefined) {
-    nextNodeIndex.value = savedData.nextNodeIndex;
-  }
-};
-
-// Hàm Auto Save (Debounce 1 giây)
-const debouncedSave = debounce(async () => {
-  if (window.electronAPI) {
-    const data = getSaveState();
-    await window.electronAPI.saveGraph(data);
-    console.log("Đã auto-save trạng thái.");
-  }
-}, 1000);
-
-// Theo dõi mọi thay đổi trong đồ thị để kích hoạt save
-watch(
-  () => [myGraph.nodes, myGraph.edges, layouts.nodes, search, graphConfig, isDirected.value],
-  () => {
-    // Chỉ save khi hệ thống đã load xong file cấu hình ban đầu
-    if (isLoaded.value) {
-      debouncedSave();
-    }
-  },
-  { deep: true }
-);
-
-// Watch sự thay đổi của isDirected để cập nhật graph và reset kết quả
-watch(isDirected, (newVal) => {
-  myGraph.isDirected = newVal;
-  isRun.value = false; // Reset kết quả thuật toán khi đổi mode
-});
-
-// --- CÁC HÀM XỬ LÝ SỰ KIỆN CŨ ---
-
-const handleAddNode = (id) => {
+// Hàm xử lý thêm node ngẫu nhiên
+const handleAddNode = (id, shouldFix = true) => {
    if (!myGraph.nodes[id]) {
      const randomX = Math.random() * 400 + 50;
      const randomY = Math.random() * 400 + 50;
      myGraph.addNode(id, id, randomX, randomY);
-     layouts.nodes[id] = { x: randomX, y: randomY };
+     layouts.nodes[id] = { x: randomX, y: randomY, fixed: shouldFix };
      nextNodeIndex.value = myGraph.getNextNodeIndex();
    }
 };
 
+// Hàm tạo đỉnh mới từ shift+click trên canvas
 const handleCreateNodeFromCanvas = (coords) => {
   const nodeName = myGraph.generateNodeName(nextNodeIndex.value);
   const nodeX = Math.round(coords.x);
@@ -233,55 +173,79 @@ const handleCreateNodeFromCanvas = (coords) => {
   
   myGraph.addNode(nodeName, nodeName, nodeX, nodeY);
   layouts.nodes[nodeName] = { x: nodeX, y: nodeY, fixed: true };
-  nextNodeIndex.value = myGraph.getNextNodeIndex();
+  nextNodeIndex.value++;
 };
 
+// Hàm thêm cạnh mới từ canvas (Shift + Click 2 node)
 const handleCreateEdgeFromCanvas = ({ source, target, weight }) => {
   const edgeId = `edge_${Date.now()}`;
   myGraph.addEdge(edgeId, source, target, weight);
 };
 
+// Hàm thêm cạnh mới từ InputView
 const handleAddEdge = (e) => {
    const edgeId = `edge_${Date.now()}`;
    myGraph.addEdge(edgeId, e.s, e.t, e.w);
 };
 
+// Hàm Import đồ thị
 const handleImportGraph = (graphData) => {
   graphData.nodes.forEach(nodeId => {
-    handleAddNode(nodeId); 
+    handleAddNode(nodeId, false); // Import node không bị fixed, để chúng trôi
   });
   graphData.edges.forEach((edge, index) => {
     const edgeId = `edge_${edge.s}_${edge.t}_${index}`;
     myGraph.addEdge(edgeId, edge.s, edge.t, edge.w);
   });
-  nextNodeIndex.value = myGraph.getNextNodeIndex();
 };
 
+// Biến trạng thái chạy thuật toán
 const isRun = ref(false); 
 
 const runAlgorithm = () => {
   isRun.value = true;
 };
 
+// --- XÓA TOÀN BỘ ĐỒ THỊ ---
 const handleDeleteAll = () => {
+  // Xóa sạch dữ liệu trong graph object
   Object.keys(myGraph.nodes).forEach(id => delete myGraph.nodes[id]);
   Object.keys(myGraph.edges).forEach(id => delete myGraph.edges[id]);
+  
+  // Xóa sạch dữ liệu tọa độ của component hiển thị
   Object.keys(layouts.nodes).forEach(id => delete layouts.nodes[id]);
 
-  nextNodeIndex.value = 0; 
+  // Đặt lại các biến trạng thái
+  nextNodeIndex.value = 0; // Trở lại tạo đỉnh 'A'
   selectedNodes.value = [];
   selectedEdges.value = [];
   isRun.value = false;
+  
+  console.log("Đã xóa toàn bộ đồ thị.");
 };
 
+// Cập nhật graph config
 const handleUpdateGraphConfig = (newConfig) => {
   Object.assign(graphConfig, newConfig);
 };
 
+// --- CỐ ĐỊNH VỊ TRÍ TẤT CẢ NODES ---
+const handleFixAllNodes = () => {
+  Object.keys(myGraph.nodes).forEach(nodeId => {
+    myGraph.fixNodePosition(nodeId);
+    if (layouts.nodes[nodeId]) {
+      layouts.nodes[nodeId].fixed = true;
+    }
+  });
+  console.log("Đã cố định vị trí tất cả các nodes.");
+};
+
+// Reset thuật toán khi đổi điểm bắt đầu hoặc kết thúc
 watch(() => [search.start, search.end], () => {
   isRun.value = false;
 });
 
+// --- LẮNG NGHE SỰ KIỆN XÓA (DELETE / BACKSPACE) ---
 const handleDeleteKey = (e) => {
   const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
   if (activeTag === 'input' || activeTag === 'textarea') return;
@@ -306,51 +270,19 @@ const handleDeleteKey = (e) => {
 
     if (hasChanges) {
       isRun.value = false;
-      nextNodeIndex.value = myGraph.getNextNodeIndex();
     }
   }
 };
 
-// --- XỬ LÝ SỰ KIỆN KHI NGƯỜI DÙNG ĐÓNG APP ---
-const handleBeforeUnload = () => {
-  // Bỏ qua thời gian chờ 1 giây, ép thực thi lệnh save ngay lập tức
-  debouncedSave.flush(); 
-};
-
-// --- LIFECYCLE HOOKS ---
-
-onMounted(async () => {
+onMounted(() => {
   window.addEventListener('keydown', handleDeleteKey);
-  window.addEventListener('beforeunload', handleBeforeUnload); // Bắt sự kiện tắt app
-
-  // Thử load trạng thái từ phiên trước
-  if (window.electronAPI) {
-    try {
-      const savedData = await window.electronAPI.loadGraph();
-      if (savedData) {
-         restoreState(savedData);
-      }
-    } catch (error) {
-      console.error("Lỗi khởi tạo state:", error);
-    }
-  } else {
-    // Nếu in ra dòng này trên F12, nghĩa là preload.js chưa chạy!
-    console.error("CẢNH BÁO: Không tìm thấy window.electronAPI. Vui lòng kiểm tra lại đường dẫn file preload.js trong file main.js!");
-  }
-  
-  // Dùng nextTick để đợi Vue cập nhật DOM xong xuôi quá trình Restore
-  await nextTick();
-  // Đánh dấu đã load xong để Watcher bắt đầu theo dõi auto-save từ thao tác tiếp theo
-  isLoaded.value = true;
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleDeleteKey);
-  window.removeEventListener('beforeunload', handleBeforeUnload);
 });
 
-// --- COMPUTEDS ---
-
+// --- TÍNH TOÁN CÁC BỘ PHẬN LIÊN THÔNG ---
 const connectedComponentsList = computed(() => {
   const nodeCount = Object.keys(myGraph.nodes).length;
   const edgeCount = Object.keys(myGraph.edges).length;
@@ -359,6 +291,7 @@ const connectedComponentsList = computed(() => {
   return myGraph.getConnectedComponents();
 });
 
+// Tính toán kết quả Dijkstra
 const result = computed(() => {
    if (Object.keys(myGraph.nodes).length === 0 || !myGraph.nodes[search.start] || !isRun.value) {
       return { path: [], pathEdges: [], totalDistance: 0 };
@@ -390,16 +323,9 @@ const result = computed(() => {
       totalDistance: totalDist === Infinity ? 0 : totalDist
    };
 });
-const graphCanvasRef = ref(null);
-const handleExportGraph = (format) => {
-  if (graphCanvasRef.value) {
-    graphCanvasRef.value.exportGraph(format);
-  }
-};
 </script>
 
 <style>
-/* CSS giữ nguyên như code cũ của bạn */
 :root {
   --bg-color: #FFFFFF;
   --text-main: #1A1A1B;
@@ -414,6 +340,7 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
+/* Các thuộc tính thẻ Card */
 .card-component {
   border: 1px solid var(--border-color);
   border-radius: 12px;

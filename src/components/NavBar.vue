@@ -4,8 +4,12 @@
       <i class="fas fa-play me-1"></i> RUN
     </button>
 
-    <button class="btn-clear me-auto" @click="$emit('delete-all')" title="Xóa toàn bộ đồ thị">
+    <button class="btn-clear me-2" @click="$emit('delete-all')" title="Xóa toàn bộ đồ thị">
       <i class="fas fa-trash-alt me-1"></i> CLEAR ALL
+    </button>
+
+    <button class="btn-lock me-auto" @click="$emit('fix-nodes')" title="Cố định vị trí tất cả nodes">
+      <i class="fas fa-lock me-1"></i> FIX ALL
     </button>
 
     <div class="form-check form-switch ms-3 me-3 mb-0 d-flex align-items-center">
@@ -54,7 +58,7 @@ defineProps({
   isDirected: Boolean // <-- Thêm prop nhận state
 })
 
-defineEmits(['run-algorithm', 'delete-all', 'export-graph', 'update:isDirected'])
+defineEmits(['run-algorithm', 'delete-all', 'export-graph', 'update:isDirected', 'fix-nodes'])
 
 const value = ref(1)
 const exportFormat = ref('svg')
@@ -121,6 +125,26 @@ const decrease = () => {
 
 .btn-clear:hover {
   background: #c82333;
+}
+
+.btn-lock {
+  background: #6c757d;
+  color: white;
+  border: none;
+  font-size: 9px;
+  font-weight: bold;
+  height: 28px;
+  line-height: 1;
+  padding: 0 8px;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.btn-lock:hover {
+  background: #5a6268;
 }
 
 .btn-export {
