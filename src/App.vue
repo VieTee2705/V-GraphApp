@@ -60,9 +60,11 @@
           :start="search.start"
           :end="search.end"
           v-model:isDirected="isDirected"
+          v-model:isFixed="isFixed"
           @run-algorithm="runAlgorithm"
           @delete-all="handleDeleteAll"
           @export-graph="handleExportGraph"
+          @fix-nodes="handleFixAllNodes"
         />
       </div>
 
@@ -103,6 +105,7 @@ const showAnotherSet = ref(false);
 
 const myGraph = reactive(new Graph());
 const isDirected = ref(false); // State cho ha đồ thị có hướng/vô hướng
+const isFixed = ref(true); // State cho cố định / trôi tự do các node
 const nextNodeIndex = ref(0);
 const layouts = reactive({ nodes: {} });
 const selectedNodes = ref([]);
@@ -137,6 +140,7 @@ const getSaveState = () => {
     search: { start: search.start, end: search.end },
     graphConfig: graphConfig,
     isDirected: isDirected.value,
+    isFixed: isFixed.value,
     nextNodeIndex: nextNodeIndex.value
   }));
 };
@@ -182,6 +186,9 @@ const restoreState = (savedData) => {
     isDirected.value = savedData.isDirected;
     myGraph.isDirected = savedData.isDirected;
   }
+  if (savedData.isFixed !== undefined) {
+    isFixed.value = savedData.isFixed;
+  }
   if (savedData.nextNodeIndex !== undefined) {
     nextNodeIndex.value = savedData.nextNodeIndex;
   }
@@ -198,7 +205,7 @@ const debouncedSave = debounce(async () => {
 
 // Theo dõi mọi thay đổi trong đồ thị để kích hoạt save
 watch(
-  () => [myGraph.nodes, myGraph.edges, layouts.nodes, search, graphConfig, isDirected.value],
+  () => [myGraph.nodes, myGraph.edges, layouts.nodes, search, graphConfig, isDirected.value, isFixed.value],
   () => {
     // Chỉ save khi hệ thống đã load xong file cấu hình ban đầu
     if (isLoaded.value) {
@@ -214,14 +221,23 @@ watch(isDirected, (newVal) => {
   isRun.value = false; // Reset kết quả thuật toán khi đổi mode
 });
 
+// Watch sự thay đổi của isFixed để cập nhật trạng thái fixed của tất cả nodes
+watch(isFixed, (newVal) => {
+  Object.keys(layouts.nodes).forEach(nodeId => {
+    layouts.nodes[nodeId].fixed = newVal;
+  });
+});
+
 // --- CÁC HÀM XỬ LÝ SỰ KIỆN CŨ ---
 
-const handleAddNode = (id) => {
+const handleAddNode = (id, shouldFix = null) => {
    if (!myGraph.nodes[id]) {
      const randomX = Math.random() * 400 + 50;
      const randomY = Math.random() * 400 + 50;
      myGraph.addNode(id, id, randomX, randomY);
-     layouts.nodes[id] = { x: randomX, y: randomY };
+     // Nếu shouldFix không chỉ định, dùng trạng thái isFixed hiện tại
+     const fixed = shouldFix !== null ? shouldFix : isFixed.value;
+     layouts.nodes[id] = { x: randomX, y: randomY, fixed: fixed };
      nextNodeIndex.value = myGraph.getNextNodeIndex();
    }
 };
@@ -232,7 +248,7 @@ const handleCreateNodeFromCanvas = (coords) => {
   const nodeY = Math.round(coords.y);
   
   myGraph.addNode(nodeName, nodeName, nodeX, nodeY);
-  layouts.nodes[nodeName] = { x: nodeX, y: nodeY, fixed: true };
+  layouts.nodes[nodeName] = { x: nodeX, y: nodeY, fixed: isFixed.value };
   nextNodeIndex.value = myGraph.getNextNodeIndex();
 };
 
@@ -248,7 +264,7 @@ const handleAddEdge = (e) => {
 
 const handleImportGraph = (graphData) => {
   graphData.nodes.forEach(nodeId => {
-    handleAddNode(nodeId); 
+    handleAddNode(nodeId, false); // Import node không bị fixed, để chúng trôi
   });
   graphData.edges.forEach((edge, index) => {
     const edgeId = `edge_${edge.s}_${edge.t}_${index}`;

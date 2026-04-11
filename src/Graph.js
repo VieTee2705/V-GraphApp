@@ -240,6 +240,98 @@ class Graph {
 
     return { distances, previous, path };
   }
+
+  /**
+   * Thuật toán Dijkstra cho đồ thị vô hướng (Dạng Generator để làm Animation)
+   * Ở mỗi bước quan trọng, hàm sẽ 'yield' ra trạng thái hiện tại.
+   */
+  *dijkstraGenerator(startNodeId, endNodeId = null) {
+    const distances = {};
+    const previous = {};
+    const visited = new Set();
+    const nodes = Object.keys(this.nodes);
+
+    // Khởi tạo
+    for (const nodeId of nodes) {
+      distances[nodeId] = Infinity;
+      previous[nodeId] = null;
+    }
+    distances[startNodeId] = 0;
+
+    // YIELD 1: Trạng thái khởi tạo xong
+    yield {
+      type: "INIT",
+      distances: { ...distances },
+      visited: new Set(visited),
+    };
+
+    while (visited.size < nodes.length) {
+      let currNodeId = null;
+      let minDistance = Infinity;
+
+      for (const nodeId of nodes) {
+        if (!visited.has(nodeId) && distances[nodeId] < minDistance) {
+          minDistance = distances[nodeId];
+          currNodeId = nodeId;
+        }
+      }
+
+      if (currNodeId === null || currNodeId === endNodeId) break;
+
+      // YIELD 2: Tô màu đỉnh đang xét (Current Node)
+      yield { type: "CURRENT_NODE", currNodeId, distances: { ...distances } };
+
+      visited.add(currNodeId);
+
+      for (const edgeId in this.edges) {
+        const edge = this.edges[edgeId];
+        let neighborId = null;
+
+        if (edge.source === currNodeId) {
+          neighborId = edge.target;
+        } else if (!this.isDirected && edge.target === currNodeId) {
+          neighborId = edge.source;
+        }
+
+        if (neighborId && !visited.has(neighborId)) {
+          // YIELD 3: Tô màu đỉnh lân cận đang chuẩn bị tính toán
+          yield { type: "CHECKING_NEIGHBOR", currNodeId, neighborId };
+
+          const alt = distances[currNodeId] + edge.weight;
+          if (alt < distances[neighborId]) {
+            distances[neighborId] = alt;
+            previous[neighborId] = currNodeId;
+
+            // YIELD 4: Nếu tìm thấy đường ngắn hơn, báo cho UI biết để chớp nháy/cập nhật bảng
+            yield {
+              type: "UPDATED_DISTANCE",
+              neighborId,
+              newDist: alt,
+              distances: { ...distances },
+            };
+          }
+        }
+      }
+
+      // YIELD 5: Đã duyệt xong đỉnh này (chuyển sang màu Xám/Đen đánh dấu đã Visited)
+      yield { type: "VISITED", currNodeId };
+    }
+
+    // Tái cấu trúc đường đi
+    let path = [];
+    if (endNodeId) {
+      let temp = endNodeId;
+      if (previous[temp] !== null || temp === startNodeId) {
+        while (temp !== null) {
+          path.unshift(temp);
+          temp = previous[temp];
+        }
+      }
+    }
+
+    // YIELD 6: Xong, trả về đường đi để UI tô đậm nét (Highlight Path)
+    yield { type: "DONE", path, distances, previous };
+  }
 }
 
 export { Node, Edge, Graph };

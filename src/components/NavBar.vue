@@ -22,6 +22,20 @@
       </label>
     </div>
 
+    <div class="form-check form-switch ms-3 me-3 mb-0 d-flex align-items-center">
+      <input 
+        class="form-check-input mt-0 me-2" 
+        type="checkbox" 
+        id="fixedSwitch" 
+        :checked="isFixed"
+        @change="$emit('update:isFixed', $event.target.checked)"
+        style="cursor: pointer;"
+      >
+      <label class="form-check-label mode-label" for="fixedSwitch">
+        {{ isFixed ? 'CỐ ĐỊNH' : 'TRÔI TỰ DO' }}
+      </label>
+    </div>
+
     <div class="export-group ms-2 me-auto d-flex align-items-center gap-1">
       <select v-model="exportFormat" class="export-select" title="Chọn định dạng">
         <option value="svg">SVG</option>
@@ -51,10 +65,11 @@ import { ref } from 'vue'
 defineProps({
   start: String,
   end: String,
-  isDirected: Boolean // <-- Thêm prop nhận state
+  isDirected: Boolean,
+  isFixed: Boolean
 })
 
-defineEmits(['run-algorithm', 'delete-all', 'export-graph', 'update:isDirected'])
+defineEmits(['run-algorithm', 'delete-all', 'export-graph', 'update:isDirected', 'update:isFixed', 'fix-nodes'])
 
 const value = ref(1)
 const exportFormat = ref('svg')
