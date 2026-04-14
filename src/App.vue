@@ -30,9 +30,31 @@
 
     <!-- TRANG 1: Đồ thị & Thuật toán -->
     <div class="row flex-grow-1 m-0 h-100" v-if="currentPage === 1" style="min-height: 0;">
-      <div class="col-3 app-input-panel">
-        <div style="display: flex; flex-direction: column; height: 100%; overflow-y: auto; gap: 1rem;">
+      
+      <!-- Cột Trái: Input / PseudoCode điều khiển bằng Tabs -->
+      <div class="col-3 app-input-panel d-flex flex-column">
+        <!-- Nút chuyển đổi Tab -->
+        <div class="nav nav-pills nav-fill mb-3" role="tablist">
+          <button 
+            class="nav-link fw-bold border" 
+            :class="{ 'active': leftPanelTab === 'input', 'text-primary': leftPanelTab !== 'input' }" 
+            @click="leftPanelTab = 'input'" 
+            style="border-radius: 8px 0 0 8px;">
+            <i class="fas fa-edit me-1"></i> Nhập liệu
+          </button>
+          <button 
+            class="nav-link fw-bold border" 
+            :class="{ 'active': leftPanelTab === 'pseudo', 'text-primary': leftPanelTab !== 'pseudo' }" 
+            @click="leftPanelTab = 'pseudo'" 
+            style="border-radius: 0 8px 8px 0; margin-left: -1px;">
+            <i class="fas fa-code me-1"></i> Mã giả
+          </button>
+        </div>
+
+        <!-- Nội dung Tab -->
+        <div class="flex-grow-1" style="overflow-y: auto; overflow-x: hidden;">
           <InputView 
+            v-show="leftPanelTab === 'input'"
             :nodes="myGraph.nodes" 
             v-model:start="search.start"
             v-model:end="search.end"
@@ -42,6 +64,7 @@
             @run-algorithm="runAlgorithm"
           />
           <PseudoCode 
+            v-show="leftPanelTab === 'pseudo'"
             :step="animStepType" 
             :u="animCurrentNode" 
             :v="animNeighborNode" 
@@ -117,6 +140,7 @@ import { Graph } from './Graph.js';
 
 const currentPage = ref(1);
 const showAnotherSet = ref(false);
+const leftPanelTab = ref('input'); // State quản lý tab cột trái ('input' hoặc 'pseudo')
 
 const myGraph = reactive(new Graph());
 const isDirected = ref(false);
@@ -144,7 +168,7 @@ const graphConfig = reactive({
 
 const isLoaded = ref(false);
 
-// --- ANIMATION STATE (Thay thế computed result cũ) ---
+// --- ANIMATION STATE ---
 const animState = ref('idle'); // idle, playing, done
 const animCurrentNode = ref(null);
 const animNeighborNode = ref(null);
@@ -338,6 +362,9 @@ const handleUpdateGraphConfig = (newConfig) => Object.assign(graphConfig, newCon
 // --- HÀM CHẠY THUẬT TOÁN (ANIMATION) ---
 const runAlgorithm = () => {
   if (Object.keys(myGraph.nodes).length === 0 || !myGraph.nodes[search.start]) return;
+
+  // Tự động chuyển tab sang Mã giả khi bắt đầu chạy thuật toán
+  leftPanelTab.value = 'pseudo'; 
 
   resetAnimationState();
   animState.value = 'playing';
