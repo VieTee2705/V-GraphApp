@@ -31,15 +31,25 @@
     <!-- TRANG 1: Đồ thị & Thuật toán -->
     <div class="row flex-grow-1 m-0 h-100" v-if="currentPage === 1" style="min-height: 0;">
       <div class="col-3 app-input-panel">
-        <InputView 
-          :nodes="myGraph.nodes" 
-          v-model:start="search.start"
-          v-model:end="search.end"
-          @add-node="handleAddNode"
-          @add-edge="handleAddEdge"
-          @import-graph="handleImportGraph"
-          @run-algorithm="runAlgorithm"
-        />
+        <div style="display: flex; flex-direction: column; height: 100%; overflow-y: auto; gap: 1rem;">
+          <InputView 
+            :nodes="myGraph.nodes" 
+            v-model:start="search.start"
+            v-model:end="search.end"
+            @add-node="handleAddNode"
+            @add-edge="handleAddEdge"
+            @import-graph="handleImportGraph"
+            @run-algorithm="runAlgorithm"
+          />
+          <PseudoCode 
+            :step="animStepType" 
+            :u="animCurrentNode" 
+            :v="animNeighborNode" 
+            :w="animEdgeWeight" 
+            :piU="animPiU" 
+            :piV="animPiV" 
+          />
+        </div>
       </div>
       
       <!-- Graph Canvas có thể co giãn linh hoạt khi bật/tắt AnotherSet -->
@@ -49,10 +59,14 @@
           :nodes="myGraph.nodes"
           :edges="myGraph.edges"
           :layouts="layouts"
-          :path-ids="result.pathEdges"
           :graph-config="graphConfig"
-          :is-directed="isDirected" v-model:selectedNodes="selectedNodes"
+          :is-directed="isDirected" 
+          v-model:selectedNodes="selectedNodes"
           v-model:selectedEdges="selectedEdges"
+          :anim-current-node="animCurrentNode"
+          :anim-neighbor-node="animNeighborNode"
+          :anim-visited-nodes="animVisitedNodes"
+          :anim-path-edges="animPathEdges"
           @create-node="handleCreateNodeFromCanvas"
           @create-edge="handleCreateEdgeFromCanvas"
         />
@@ -92,20 +106,21 @@
 
 <script setup>
 import { reactive, ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
-import debounce from 'lodash/debounce'; // <-- Thêm lodash debounce
+import debounce from 'lodash/debounce';
 import InputView from './components/InputView2.vue';
 import GraphCanvas from './components/GraphCanvas.vue';
 import AnotherSet from './components/AnotherSet.vue';
 import NavBar from './components/NavBar.vue';
 import ConnectedComponents from './components/ConnectedComponents.vue'; 
+import PseudoCode from './components/PseudoCode.vue';
 import { Graph } from './Graph.js'; 
 
 const currentPage = ref(1);
 const showAnotherSet = ref(false);
 
 const myGraph = reactive(new Graph());
-const isDirected = ref(false); // State cho ha đồ thị có hướng/vô hướng
-const isFixed = ref(true); // State cho cố định / trôi tự do các node
+const isDirected = ref(false);
+const isFixed = ref(true);
 const nextNodeIndex = ref(0);
 const layouts = reactive({ nodes: {} });
 const selectedNodes = ref([]);
@@ -127,11 +142,55 @@ const graphConfig = reactive({
   pathColor: '#0056B3'
 });
 
-const isLoaded = ref(false); // Cờ kiểm tra đã load data lần đầu chưa
+const isLoaded = ref(false);
+
+// --- ANIMATION STATE (Thay thế computed result cũ) ---
+const animState = ref('idle'); // idle, playing, done
+const animCurrentNode = ref(null);
+const animNeighborNode = ref(null);
+const animVisitedNodes = ref(new Set());
+const animPathEdges = ref([]);
+const animStepType = ref('idle');
+const animEdgeWeight = ref(0);
+const animPiU = ref(Infinity);
+const animPiV = ref(Infinity);
+let animationTimer = null;
+
+// Đối tượng result reactive để đồng bộ với AnotherSet Component
+const result = reactive({
+  path: [],
+  pathEdges: [],
+  totalDistance: 0,
+  distances: {}
+});
+
+// Hàm dừng animation
+const stopAnimation = () => {
+  if (animationTimer) {
+    clearInterval(animationTimer);
+    animationTimer = null;
+  }
+};
+
+// Hàm Reset các state animation
+const resetAnimationState = () => {
+  stopAnimation();
+  animState.value = 'idle';
+  animCurrentNode.value = null;
+  animNeighborNode.value = null;
+  animVisitedNodes.value.clear();
+  animPathEdges.value = [];
+  animStepType.value = 'idle';
+  animEdgeWeight.value = 0;
+  animPiU.value = Infinity;
+  animPiV.value = Infinity;
+  result.path = [];
+  result.pathEdges = [];
+  result.totalDistance = 0;
+  result.distances = {};
+};
 
 // --- LOGIC AUTO-SAVE & RESTORE ---
-
-// Gom nhóm dữ liệu cần lưu
 const getSaveState = () => {
   return JSON.parse(JSON.stringify({
     nodes: myGraph.nodes,
@@ -145,16 +204,12 @@ const getSaveState = () => {
   }));
 };
 
-// Hàm khôi phục dữ liệu từ file
 const restoreState = (savedData) => {
   if (!savedData) return;
-
-  // Xóa sạch graph cũ
   Object.keys(myGraph.nodes).forEach(id => delete myGraph.nodes[id]);
   Object.keys(myGraph.edges).forEach(id => delete myGraph.edges[id]);
   Object.keys(layouts.nodes).forEach(id => delete layouts.nodes[id]);
 
-  // Nạp lại Nodes
   if (savedData.nodes) {
     Object.values(savedData.nodes).forEach(n => {
       myGraph.addNode(n.id, n.name, n.x, n.y);
@@ -162,39 +217,26 @@ const restoreState = (savedData) => {
     });
   }
 
-  // Nạp lại Edges
   if (savedData.edges) {
     Object.values(savedData.edges).forEach(e => {
       myGraph.addEdge(e.id, e.source, e.target, e.weight);
     });
   }
 
-  // Nạp lại Layouts (tọa độ canvas)
-  if (savedData.layouts) {
-    Object.assign(layouts.nodes, savedData.layouts);
-  }
-
-  // Nạp lại cài đặt khác
+  if (savedData.layouts) Object.assign(layouts.nodes, savedData.layouts);
   if (savedData.search) {
     search.start = savedData.search.start || "";
     search.end = savedData.search.end || "";
   }
-  if (savedData.graphConfig) {
-    Object.assign(graphConfig, savedData.graphConfig);
-  }
+  if (savedData.graphConfig) Object.assign(graphConfig, savedData.graphConfig);
   if (savedData.isDirected !== undefined) {
     isDirected.value = savedData.isDirected;
     myGraph.isDirected = savedData.isDirected;
   }
-  if (savedData.isFixed !== undefined) {
-    isFixed.value = savedData.isFixed;
-  }
-  if (savedData.nextNodeIndex !== undefined) {
-    nextNodeIndex.value = savedData.nextNodeIndex;
-  }
+  if (savedData.isFixed !== undefined) isFixed.value = savedData.isFixed;
+  if (savedData.nextNodeIndex !== undefined) nextNodeIndex.value = savedData.nextNodeIndex;
 };
 
-// Hàm Auto Save (Debounce 1 giây)
 const debouncedSave = debounce(async () => {
   if (window.electronAPI) {
     const data = getSaveState();
@@ -203,39 +245,31 @@ const debouncedSave = debounce(async () => {
   }
 }, 1000);
 
-// Theo dõi mọi thay đổi trong đồ thị để kích hoạt save
 watch(
   () => [myGraph.nodes, myGraph.edges, layouts.nodes, search, graphConfig, isDirected.value, isFixed.value],
-  () => {
-    // Chỉ save khi hệ thống đã load xong file cấu hình ban đầu
-    if (isLoaded.value) {
-      debouncedSave();
-    }
-  },
+  () => { if (isLoaded.value) debouncedSave(); },
   { deep: true }
 );
 
-// Watch sự thay đổi của isDirected để cập nhật graph và reset kết quả
 watch(isDirected, (newVal) => {
   myGraph.isDirected = newVal;
-  isRun.value = false; // Reset kết quả thuật toán khi đổi mode
+  resetAnimationState();
 });
 
-// Watch sự thay đổi của isFixed để cập nhật trạng thái fixed của tất cả nodes
 watch(isFixed, (newVal) => {
-  Object.keys(layouts.nodes).forEach(nodeId => {
-    layouts.nodes[nodeId].fixed = newVal;
-  });
+  Object.keys(layouts.nodes).forEach(nodeId => { layouts.nodes[nodeId].fixed = newVal; });
 });
 
-// --- CÁC HÀM XỬ LÝ SỰ KIỆN CŨ ---
+watch(() => [search.start, search.end], () => {
+  resetAnimationState();
+});
 
+// --- CÁC HÀM XỬ LÝ SỰ KIỆN CANVAS ---
 const handleAddNode = (id, shouldFix = null) => {
    if (!myGraph.nodes[id]) {
      const randomX = Math.random() * 400 + 50;
      const randomY = Math.random() * 400 + 50;
      myGraph.addNode(id, id, randomX, randomY);
-     // Nếu shouldFix không chỉ định, dùng trạng thái isFixed hiện tại
      const fixed = shouldFix !== null ? shouldFix : isFixed.value;
      layouts.nodes[id] = { x: randomX, y: randomY, fixed: fixed };
      nextNodeIndex.value = myGraph.getNextNodeIndex();
@@ -244,59 +278,34 @@ const handleAddNode = (id, shouldFix = null) => {
 
 const handleCreateNodeFromCanvas = (coords) => {
   const nodeName = myGraph.generateNodeName(nextNodeIndex.value);
-  const nodeX = Math.round(coords.x);
-  const nodeY = Math.round(coords.y);
-  
-  myGraph.addNode(nodeName, nodeName, nodeX, nodeY);
-  layouts.nodes[nodeName] = { x: nodeX, y: nodeY, fixed: isFixed.value };
+  myGraph.addNode(nodeName, nodeName, Math.round(coords.x), Math.round(coords.y));
+  layouts.nodes[nodeName] = { x: Math.round(coords.x), y: Math.round(coords.y), fixed: isFixed.value };
   nextNodeIndex.value = myGraph.getNextNodeIndex();
 };
 
 const handleCreateEdgeFromCanvas = ({ source, target, weight }) => {
-  const edgeId = `edge_${Date.now()}`;
-  myGraph.addEdge(edgeId, source, target, weight);
+  myGraph.addEdge(`edge_${Date.now()}`, source, target, weight);
 };
 
 const handleAddEdge = (e) => {
-   const edgeId = `edge_${Date.now()}`;
-   myGraph.addEdge(edgeId, e.s, e.t, e.w);
+   myGraph.addEdge(`edge_${Date.now()}`, e.s, e.t, e.w);
 };
 
 const handleImportGraph = (graphData) => {
-  graphData.nodes.forEach(nodeId => {
-    handleAddNode(nodeId, false); // Import node không bị fixed, để chúng trôi
-  });
-  graphData.edges.forEach((edge, index) => {
-    const edgeId = `edge_${edge.s}_${edge.t}_${index}`;
-    myGraph.addEdge(edgeId, edge.s, edge.t, edge.w);
-  });
+  graphData.nodes.forEach(nodeId => handleAddNode(nodeId, false));
+  graphData.edges.forEach((edge, index) => myGraph.addEdge(`edge_${edge.s}_${edge.t}_${index}`, edge.s, edge.t, edge.w));
   nextNodeIndex.value = myGraph.getNextNodeIndex();
 };
 
-const isRun = ref(false); 
-
-const runAlgorithm = () => {
-  isRun.value = true;
-};
-
 const handleDeleteAll = () => {
+  resetAnimationState();
   Object.keys(myGraph.nodes).forEach(id => delete myGraph.nodes[id]);
   Object.keys(myGraph.edges).forEach(id => delete myGraph.edges[id]);
   Object.keys(layouts.nodes).forEach(id => delete layouts.nodes[id]);
-
   nextNodeIndex.value = 0; 
   selectedNodes.value = [];
   selectedEdges.value = [];
-  isRun.value = false;
 };
-
-const handleUpdateGraphConfig = (newConfig) => {
-  Object.assign(graphConfig, newConfig);
-};
-
-watch(() => [search.start, search.end], () => {
-  isRun.value = false;
-});
 
 const handleDeleteKey = (e) => {
   const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
@@ -304,13 +313,11 @@ const handleDeleteKey = (e) => {
 
   if (e.key === 'Delete' || e.key === 'Backspace') {
     let hasChanges = false;
-
     if (selectedEdges.value.length > 0) {
       selectedEdges.value.forEach(edgeId => myGraph.removeEdge(edgeId));
       selectedEdges.value = [];
       hasChanges = true;
     }
-
     if (selectedNodes.value.length > 0) {
       selectedNodes.value.forEach(nodeId => {
         myGraph.removeNode(nodeId);
@@ -319,103 +326,128 @@ const handleDeleteKey = (e) => {
       selectedNodes.value = [];
       hasChanges = true;
     }
-
     if (hasChanges) {
-      isRun.value = false;
+      resetAnimationState();
       nextNodeIndex.value = myGraph.getNextNodeIndex();
     }
   }
 };
 
-// --- XỬ LÝ SỰ KIỆN KHI NGƯỜI DÙNG ĐÓNG APP ---
-const handleBeforeUnload = () => {
-  // Bỏ qua thời gian chờ 1 giây, ép thực thi lệnh save ngay lập tức
-  debouncedSave.flush(); 
+const handleUpdateGraphConfig = (newConfig) => Object.assign(graphConfig, newConfig);
+
+// --- HÀM CHẠY THUẬT TOÁN (ANIMATION) ---
+const runAlgorithm = () => {
+  if (Object.keys(myGraph.nodes).length === 0 || !myGraph.nodes[search.start]) return;
+
+  resetAnimationState();
+  animState.value = 'playing';
+
+  // Khởi tạo Generator
+  const generator = myGraph.dijkstraGenerator(search.start, search.end);
+
+  // Vòng lặp animation mỗi 500ms
+  animationTimer = setInterval(() => {
+    const step = generator.next();
+    
+    if (step.done) {
+      stopAnimation();
+      animState.value = 'done';
+      animStepType.value = 'DONE';
+      return;
+    }
+
+    const state = step.value;
+    animStepType.value = state.type;
+    
+    switch(state.type) {
+      case 'INIT':
+        Object.assign(result.distances, state.distances);
+        animVisitedNodes.value = new Set(state.visited);
+        break;
+      case 'CURRENT_NODE':
+        animCurrentNode.value = state.currNodeId;
+        animNeighborNode.value = null; // Xóa neighbor cũ
+        animPiU.value = state.distances[state.currNodeId];
+        Object.assign(result.distances, state.distances);
+        break;
+      case 'CHECKING_NEIGHBOR':
+        animNeighborNode.value = state.neighborId;
+        const edgeId = Object.keys(myGraph.edges).find(id => {
+          const e = myGraph.edges[id];
+          return (e.source === state.currNodeId && e.target === state.neighborId) || 
+                 (!isDirected.value && e.source === state.neighborId && e.target === state.currNodeId);
+        });
+        animEdgeWeight.value = edgeId ? myGraph.edges[edgeId].weight : 0;
+        animPiV.value = result.distances[state.neighborId];
+        break;
+      case 'UPDATED_DISTANCE':
+        Object.assign(result.distances, state.distances);
+        animPiV.value = state.distances[state.neighborId]; // Cập nhật ngay giá trị mới để highlight hiển thị kịp thời
+        break;
+      case 'VISITED':
+        animVisitedNodes.value.add(state.currNodeId);
+        animCurrentNode.value = null;
+        animNeighborNode.value = null;
+        break;
+      case 'DONE':
+        // Xử lý tạo mảng Edge ID để tô đậm đường đi
+        const pathNodes = state.path;
+        const pathEdgesIds = [];
+        for (let i = 0; i < pathNodes.length - 1; i++) {
+          const u = pathNodes[i];
+          const v = pathNodes[i+1];
+          const edgeId = Object.keys(myGraph.edges).find(id => {
+            const e = myGraph.edges[id];
+            return (e.source === u && e.target === v) || (!isDirected.value && e.source === v && e.target === u);
+          });
+          if (edgeId) pathEdgesIds.push(edgeId);
+        }
+        
+        animPathEdges.value = pathEdgesIds;
+        result.path = pathNodes;
+        result.pathEdges = pathEdgesIds;
+        result.totalDistance = state.distances[search.end] !== Infinity ? state.distances[search.end] : 0;
+        break;
+    }
+  }, 500); // Tốc độ animation: 500ms/bước
 };
 
-// --- LIFECYCLE HOOKS ---
+// --- LIFECYCLE ---
+const handleBeforeUnload = () => debouncedSave.flush(); 
 
 onMounted(async () => {
   window.addEventListener('keydown', handleDeleteKey);
-  window.addEventListener('beforeunload', handleBeforeUnload); // Bắt sự kiện tắt app
+  window.addEventListener('beforeunload', handleBeforeUnload);
 
-  // Thử load trạng thái từ phiên trước
   if (window.electronAPI) {
     try {
       const savedData = await window.electronAPI.loadGraph();
-      if (savedData) {
-         restoreState(savedData);
-      }
-    } catch (error) {
-      console.error("Lỗi khởi tạo state:", error);
-    }
-  } else {
-    // Nếu in ra dòng này trên F12, nghĩa là preload.js chưa chạy!
-    console.error("CẢNH BÁO: Không tìm thấy window.electronAPI. Vui lòng kiểm tra lại đường dẫn file preload.js trong file main.js!");
+      if (savedData) restoreState(savedData);
+    } catch (error) { console.error("Lỗi khởi tạo state:", error); }
   }
-  
-  // Dùng nextTick để đợi Vue cập nhật DOM xong xuôi quá trình Restore
   await nextTick();
-  // Đánh dấu đã load xong để Watcher bắt đầu theo dõi auto-save từ thao tác tiếp theo
   isLoaded.value = true;
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleDeleteKey);
   window.removeEventListener('beforeunload', handleBeforeUnload);
+  stopAnimation();
 });
 
-// --- COMPUTEDS ---
-
+// --- COMPUTEDS CHO TRANG 2 ---
 const connectedComponentsList = computed(() => {
-  const nodeCount = Object.keys(myGraph.nodes).length;
-  const edgeCount = Object.keys(myGraph.edges).length;
-  if (nodeCount === 0) return [];
-  
+  if (Object.keys(myGraph.nodes).length === 0) return [];
   return myGraph.getConnectedComponents();
 });
 
-const result = computed(() => {
-   if (Object.keys(myGraph.nodes).length === 0 || !myGraph.nodes[search.start] || !isRun.value) {
-      return { path: [], pathEdges: [], totalDistance: 0 };
-   }
-
-   const dijkstraResult = myGraph.dijkstra(search.start, search.end);
-   const pathNodes = dijkstraResult.path;
-   const pathEdges = [];
-
-   for (let i = 0; i < pathNodes.length - 1; i++) {
-      const u = pathNodes[i];
-      const v = pathNodes[i+1];
-      
-      const edgeId = Object.keys(myGraph.edges).find(id => {
-         const e = myGraph.edges[id];
-         return (e.source === u && e.target === v) || (e.source === v && e.target === u);
-      });
-      
-      if (edgeId) {
-          pathEdges.push(edgeId);
-      }
-   }
-
-   const totalDist = dijkstraResult.distances[search.end];
-
-   return {
-      path: pathNodes,
-      pathEdges: pathEdges,
-      totalDistance: totalDist === Infinity ? 0 : totalDist
-   };
-});
 const graphCanvasRef = ref(null);
 const handleExportGraph = (format) => {
-  if (graphCanvasRef.value) {
-    graphCanvasRef.value.exportGraph(format);
-  }
+  if (graphCanvasRef.value) graphCanvasRef.value.exportGraph(format);
 };
 </script>
 
 <style>
-/* CSS giữ nguyên như code cũ của bạn */
 :root {
   --bg-color: #FFFFFF;
   --text-main: #1A1A1B;
@@ -511,14 +543,8 @@ html, body, #app {
 }
 
 @keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 .app-input-panel,
@@ -532,13 +558,8 @@ html, body, #app {
   height: 100%;
 }
 
-.app-input-panel {
-  border-right: 1px solid var(--border-color);
-}
-
-.app-side-panel {
-  border-left: 1px solid var(--border-color);
-}
+.app-input-panel { border-right: 1px solid var(--border-color); }
+.app-side-panel { border-left: 1px solid var(--border-color); }
 
 .graph-container {
   flex: 1;
