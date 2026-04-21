@@ -1,5 +1,5 @@
 {
-  "name": "dijkstra-app",
+  "name": "V-Graph",
   "version": "1.0.0",
   "description": "",
   "main": "dist-electron/main.js",
