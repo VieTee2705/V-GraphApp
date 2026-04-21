@@ -98,6 +98,7 @@
           :end="search.end"
           v-model:isDirected="isDirected"
           v-model:isFixed="isFixed"
+          v-model:speed="speed"
           @run-algorithm="runAlgorithm"
           @delete-all="handleDeleteAll"
           @export-graph="handleExportGraph"
@@ -151,6 +152,7 @@ const nextNodeIndex = ref(0);
 const layouts = reactive({ nodes: {} });
 const selectedNodes = ref([]);
 const selectedEdges = ref([]);
+const speed = ref(500); // Tốc độ animation (ms)
 
 const search = reactive({ start: "A", end: "D" });
 
@@ -181,6 +183,7 @@ const animEdgeWeight = ref(0);
 const animPiU = ref(Infinity);
 const animPiV = ref(Infinity);
 let animationTimer = null;
+let currentGenerator = null; // Biến lưu trữ phiên chạy generator hiện tại
 
 // Đối tượng result reactive để đồng bộ với AnotherSet Component
 const result = reactive({
@@ -201,6 +204,7 @@ const stopAnimation = () => {
 // Hàm Reset các state animation
 const resetAnimationState = () => {
   stopAnimation();
+  currentGenerator = null;
   animState.value = 'idle';
   animCurrentNode.value = null;
   animNeighborNode.value = null;
@@ -361,22 +365,13 @@ const handleDeleteKey = (e) => {
 
 const handleUpdateGraphConfig = (newConfig) => Object.assign(graphConfig, newConfig);
 
-// --- HÀM CHẠY THUẬT TOÁN (ANIMATION) ---
-const runAlgorithm = () => {
-  if (Object.keys(myGraph.nodes).length === 0 || !myGraph.nodes[search.start]) return;
+// Hàm tạo và tiếp tục animation interval theo biến speed hiện hành
+const resumeAnimation = () => {
+  if (animationTimer) stopAnimation();
+  if (!currentGenerator) return;
 
-  // Tự động chuyển tab sang Mã giả khi bắt đầu chạy thuật toán
-  leftPanelTab.value = 'pseudo'; 
-
-  resetAnimationState();
-  animState.value = 'playing';
-
-  // Khởi tạo Generator
-  const generator = myGraph.dijkstraGenerator(search.start, search.end);
-
-  // Vòng lặp animation mỗi 500ms
   animationTimer = setInterval(() => {
-    const step = generator.next();
+    const step = currentGenerator.next();
     
     if (step.done) {
       stopAnimation();
@@ -411,7 +406,7 @@ const runAlgorithm = () => {
         break;
       case 'UPDATED_DISTANCE':
         Object.assign(result.distances, state.distances);
-        animPiV.value = state.distances[state.neighborId]; // Cập nhật ngay giá trị mới để highlight hiển thị kịp thời
+        animPiV.value = state.distances[state.neighborId]; 
         break;
       case 'VISITED':
         animVisitedNodes.value.add(state.currNodeId);
@@ -419,15 +414,38 @@ const runAlgorithm = () => {
         animNeighborNode.value = null;
         break;
       case 'DONE':
-        // SỬA TẠI ĐÂY: Lấy trực tiếp mảng cung tối ưu từ thuật toán trả về
         animPathEdges.value = state.pathEdges;
         result.path = state.path;
         result.pathEdges = state.pathEdges;
         result.totalDistance = state.distances[search.end] !== Infinity ? state.distances[search.end] : 0;
         break;
     }
-  }, 500); // Tốc độ animation: 500ms/bước
+  }, speed.value); // Tốc độ animation luôn linh động
 };
+
+// --- HÀM CHẠY THUẬT TOÁN ---
+const runAlgorithm = () => {
+  if (Object.keys(myGraph.nodes).length === 0 || !myGraph.nodes[search.start]) return;
+
+  // Tự động chuyển tab sang Mã giả khi bắt đầu chạy thuật toán
+  leftPanelTab.value = 'pseudo'; 
+
+  resetAnimationState();
+  animState.value = 'playing';
+
+  // Khởi tạo Generator và lưu vào biến toàn cục cục bộ để Resume dễ dàng
+  currentGenerator = myGraph.dijkstraGenerator(search.start, search.end);
+  
+  resumeAnimation();
+};
+
+// Theo dõi khi tốc độ thay đổi để cập nhật realtime
+watch(speed, (newSpeed) => {
+  if (animState.value === 'playing') {
+    resumeAnimation(); // Tạo lại interval với speed mới
+  }
+});
+
 
 // --- LIFECYCLE ---
 const handleBeforeUnload = () => debouncedSave.flush(); 
@@ -454,8 +472,6 @@ onUnmounted(() => {
 
 // --- COMPUTEDS CHO TRANG 2 ---
 const connectedComponentsList = computed(() => {
-  // MẸO: Truy cập các giá trị này để ép Vue tạo dependency. 
-  // Mỗi khi số lượng đỉnh, số cạnh, hoặc chế độ có hướng thay đổi, computed sẽ tự chạy lại.
   const _trackNodesCount = Object.keys(myGraph.nodes).length;
   const _trackEdgesCount = Object.keys(myGraph.edges).length;
   const _trackDirected = isDirected.value;

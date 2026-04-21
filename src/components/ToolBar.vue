@@ -52,7 +52,7 @@
       <button class="btn-step" @click="decrease">
         <i class="fas fa-minus"></i>
       </button>
-      <span class="value-text mx-2">{{ value }}</span>
+      <span class="value-text mx-2">{{ speed }}ms</span>
       <button class="btn-step" @click="increase">
         <i class="fas fa-plus"></i>
       </button>
@@ -63,26 +63,26 @@
 <script setup>
 import { ref } from 'vue'
 
-defineProps({
+const props = defineProps({
   start: String,
   end: String,
   isDirected: Boolean,
-  isFixed: Boolean
+  isFixed: Boolean,
+  speed: Number // Khai báo prop speed
 })
 
-defineEmits(['run-algorithm', 'delete-all', 'export-graph', 'update:isDirected', 'update:isFixed', 'fix-nodes'])
+const emit = defineEmits(['run-algorithm', 'delete-all', 'export-graph', 'update:isDirected', 'update:isFixed', 'fix-nodes', 'update:speed'])
 
-const value = ref(500)
 const exportFormat = ref('svg')
 
-const increase = () => value.value+=100
+// Phát sự kiện update:speed thay vì đổi biến nội bộ
+const increase = () => emit('update:speed', props.speed + 100)
 const decrease = () => {
-  if (value.value > 100) value.value-=100
+  if (props.speed > 100) emit('update:speed', props.speed - 100)
 }
 </script>
+
 <style scoped>
-/* Không cần khai báo lại :root nếu đã có ở file CSS global, 
-   nhưng mình giữ lại theo code của bạn để đảm bảo không bị lỗi */
 :root {
   --bg-color: #FFFFFF;
   --text-main: #1A1A1B;
@@ -93,10 +93,10 @@ const decrease = () => {
 
 /* 1. Thanh Toolbar chính */
 .mini-navbar {
-  min-height: 44px; /* Nới lỏng chiều cao để không bị gò bó */
+  min-height: 44px;
   background-color: var(--bg-color);
   border-bottom: 1px solid var(--border-color);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02); /* Đổ bóng cực nhẹ tạo chiều sâu */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
   padding: 0 16px;
 }
 
@@ -121,7 +121,6 @@ const decrease = () => {
   margin-right: 6px;
 }
 
-/* --- Nút RUN (Màu Primary - Nổi bật nhất) --- */
 .btn-run {
   background-color: var(--primary-color);
   color: #ffffff;
@@ -129,7 +128,7 @@ const decrease = () => {
 }
 
 .btn-run:hover:not(:disabled) {
-  background-color: #004494; /* Đậm hơn khi hover */
+  background-color: #004494;
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(0, 86, 179, 0.35);
 }
@@ -141,7 +140,6 @@ const decrease = () => {
   opacity: 0.8;
 }
 
-/* --- Nút CLEAR ALL (Style Outline - Chuyên nghiệp) --- */
 .btn-clear {
   background-color: transparent;
   color: #dc3545;
@@ -153,7 +151,7 @@ const decrease = () => {
   color: #ffffff;
 }
 
-/* 3. Khu vực Switches (Có hướng / Cố định) */
+/* 3. Khu vực Switches */
 .form-check-input {
   cursor: pointer;
 }
@@ -177,12 +175,12 @@ const decrease = () => {
   min-width: 70px;
 }
 
-/* 4. Nhóm Export (Gom Select và Nút vào một khối liền mạch) */
+/* 4. Nhóm Export */
 .export-group {
   background-color: #f8f9fa;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  padding: 2px 2px 2px 8px; /* Thụt lề nhẹ cho select box */
+  padding: 2px 2px 2px 8px;
 }
 
 .export-select {
@@ -209,7 +207,7 @@ const decrease = () => {
   color: #0f172a;
 }
 
-/* Khối Counter (đang bị comment) được điều chỉnh sẵn cho tương lai */
+/* 5. Khối Counter Control */
 .counter-control {
   background-color: #f8f9fa;
   border: 1px solid var(--border-color);

@@ -121,54 +121,117 @@ class Graph {
     }
   }
   getConnectedComponents() {
-    const visited = new Set();
     const components = [];
     const nodeIds = Object.keys(this.nodes);
 
-    const adj = {};
-    nodeIds.forEach((id) => (adj[id] = []));
+    if (this.isDirected) {
+      // TRƯỜNG HỢP CÓ HƯỚNG: Sử dụng Thuật toán Tarjan để tìm Thành phần liên thông mạnh (SCC)
+      let index = 0;
+      const stack = [];
+      const indices = {};
+      const lowlink = {};
+      const onStack = {};
 
-    Object.values(this.edges).forEach((edge) => {
-      adj[edge.source].push(edge.target);
-      if (!this.isDirected) {
-        adj[edge.target].push(edge.source);
-      }
-    });
+      // Xây dựng danh sách kề có hướng
+      const adj = {};
+      nodeIds.forEach((id) => (adj[id] = []));
+      Object.values(this.edges).forEach((edge) => {
+        adj[edge.source].push(edge.target);
+      });
 
-    // Chạy BFS bình thường
-    for (const startNodeId of nodeIds) {
-      if (!visited.has(startNodeId)) {
-        const currentComponentNodes = [];
-        const queue = [startNodeId];
-        visited.add(startNodeId);
+      const strongconnect = (v) => {
+        indices[v] = index;
+        lowlink[v] = index;
+        index++;
+        stack.push(v);
+        onStack[v] = true;
 
-        while (queue.length > 0) {
-          const currNodeId = queue.shift();
-          currentComponentNodes.push(currNodeId);
+        (adj[v] || []).forEach((w) => {
+          if (indices[w] === undefined) {
+            // Đỉnh w chưa được thăm
+            strongconnect(w);
+            lowlink[v] = Math.min(lowlink[v], lowlink[w]);
+          } else if (onStack[w]) {
+            // Đỉnh w đã nằm trên stack (tạo thành một chu trình)
+            lowlink[v] = Math.min(lowlink[v], indices[w]);
+          }
+        });
 
-          (adj[currNodeId] || []).forEach((neighborId) => {
-            if (!visited.has(neighborId)) {
-              visited.add(neighborId);
-              queue.push(neighborId);
-            }
+        // Nếu v là đỉnh gốc của một SCC
+        if (lowlink[v] === indices[v]) {
+          const currentComponentNodes = [];
+          let w;
+          do {
+            w = stack.pop();
+            onStack[w] = false;
+            currentComponentNodes.push(w);
+          } while (w !== v);
+
+          // Đóng gói Nodes và Edges cho SCC này
+          const compEdges = Object.values(this.edges).filter(
+            (edge) =>
+              currentComponentNodes.includes(String(edge.source)) &&
+              currentComponentNodes.includes(String(edge.target)),
+          );
+          const compNodes = currentComponentNodes.map((id) => this.nodes[id]);
+
+          components.push({
+            nodeIds: currentComponentNodes,
+            nodes: compNodes,
+            edges: compEdges,
           });
         }
+      };
 
-        // MỚI: Thay vì chỉ push mảng ID, ta đóng gói luôn Nodes và Edges cho cụm này
-        const compEdges = Object.values(this.edges).filter(
-          (edge) =>
-            currentComponentNodes.includes(String(edge.source)) &&
-            currentComponentNodes.includes(String(edge.target)),
-        );
+      // Chạy thuật toán Tarjan cho mọi đỉnh
+      nodeIds.forEach((v) => {
+        if (indices[v] === undefined) {
+          strongconnect(v);
+        }
+      });
+    } else {
+      // TRƯỜNG HỢP VÔ HƯỚNG: Chạy BFS bình thường như cũ
+      const visited = new Set();
+      const adj = {};
+      nodeIds.forEach((id) => (adj[id] = []));
 
-        // (Tùy chọn) Lấy luôn thông tin node gốc nếu bạn cần
-        const compNodes = currentComponentNodes.map((id) => this.nodes[id]);
+      Object.values(this.edges).forEach((edge) => {
+        adj[edge.source].push(edge.target);
+        adj[edge.target].push(edge.source);
+      });
 
-        components.push({
-          nodeIds: currentComponentNodes, // Vẫn giữ lại mảng ID cho chắc
-          nodes: compNodes,
-          edges: compEdges,
-        });
+      for (const startNodeId of nodeIds) {
+        if (!visited.has(startNodeId)) {
+          const currentComponentNodes = [];
+          const queue = [startNodeId];
+          visited.add(startNodeId);
+
+          while (queue.length > 0) {
+            const currNodeId = queue.shift();
+            currentComponentNodes.push(currNodeId);
+
+            (adj[currNodeId] || []).forEach((neighborId) => {
+              if (!visited.has(neighborId)) {
+                visited.add(neighborId);
+                queue.push(neighborId);
+              }
+            });
+          }
+
+          // Đóng gói Nodes và Edges cho cụm này
+          const compEdges = Object.values(this.edges).filter(
+            (edge) =>
+              currentComponentNodes.includes(String(edge.source)) &&
+              currentComponentNodes.includes(String(edge.target)),
+          );
+          const compNodes = currentComponentNodes.map((id) => this.nodes[id]);
+
+          components.push({
+            nodeIds: currentComponentNodes,
+            nodes: compNodes,
+            edges: compEdges,
+          });
+        }
       }
     }
 
