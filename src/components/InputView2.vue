@@ -31,7 +31,7 @@
       <hr>
 
       <section class="mb-4">
-        <h6 class="fw-bold mb-3" style="color: var(--primary-color)">3. Thuật toán Dijkstra</h6>
+        <h6 class="fw-bold mb-3 text-main">3. Thuật toán Dijkstra</h6>
         <label class="small text-muted mb-1">Bắt đầu từ:</label>
         <select :value="start" @input="$emit('update:start', $event.target.value)" class="form-select mb-3">
             <option v-for="(n, id) in nodes" :key="'s-'+id" :value="id">{{id}}</option>
@@ -46,7 +46,7 @@
       <hr>
 
       <section class="mb-4">
-        <h6 class="fw-bold mb-3 text-success">4. Nhập nhanh từ File (.txt)</h6>
+        <h6 class="fw-bold mb-3 text-main">4. Nhập nhanh từ File (.txt)</h6>
         <input type="file" @change="handleFileUpload" accept=".txt" class="form-control mb-2" />
         <div class="form-text small">
           <strong>Định dạng file:</strong> Mỗi dòng chứa <code>[Đỉnh 1] [Đỉnh 2] [Trọng số]</code> (cách nhau bởi khoảng trắng). <br/>
@@ -168,5 +168,140 @@ export default {
 </script>
 
 <style scoped>
-/* shared styling handled globally */
+/* Các biến màu đã được kế thừa từ :root chung, 
+   chỉ bổ sung các biến phục vụ hiệu ứng hover/shadow nội bộ */
+:root {
+  --hover-color: #004494;
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --radius-sm: 6px;
+}
+
+/* 1. Xử lý thanh cuộn (Scrollbar) cho thân Card */
+.card-body {
+  padding: 1.5rem;
+  flex-grow: 1;      /* Lấp đầy khoảng trống còn lại của .card-component */
+  overflow-y: auto;  /* Bật scrollbar dọc khi nội dung quá dài */
+  min-height: 0;     /* Rất quan trọng: Ngăn chặn lỗi tràn content trong Flexbox */
+}
+
+/* Tùy chỉnh thanh cuộn cho gọn gàng, tinh tế hơn trên trình duyệt Webkit */
+.card-body::-webkit-scrollbar {
+  width: 6px;
+}
+.card-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.card-body::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 10px;
+}
+.card-body::-webkit-scrollbar-thumb:hover {
+  background-color: #adb5bd;
+}
+
+/* 2. Tiêu đề các phần */
+.card-body h6 {
+  font-size: 0.95rem;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+}
+
+.text-main { color: var(--text-main) !important; }
+
+/* 3. Form Controls (Input & Select) */
+.form-control, .form-select {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.85rem;
+  font-size: 0.9rem;
+  color: var(--text-main);
+  background-color: var(--bg-color);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px var(--accent-color);
+  outline: none;
+}
+
+/* 4. Nút bấm (Buttons) */
+.btn {
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Nút thêm đỉnh */
+.btn-primary-custom {
+  background-color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+  color: #ffffff;
+}
+
+.btn-primary-custom:hover {
+  background-color: var(--hover-color);
+  border-color: var(--hover-color);
+  color: #ffffff;
+  box-shadow: var(--shadow-md);
+}
+
+/* Nút thêm cạnh */
+.btn-outline-custom {
+  background-color: transparent;
+  border: 1px dashed var(--primary-color);
+  color: var(--primary-color);
+  padding: 0.6rem;
+}
+
+.btn-outline-custom:hover {
+  background-color: var(--accent-color);
+  color: var(--primary-color);
+  border-style: solid;
+}
+
+/* 5. Đường phân cách */
+hr {
+  border-color: var(--border-color);
+  opacity: 0.5;
+  margin: 1.5rem 0;
+}
+
+/* 6. Khu vực Upload File */
+input[type="file"].form-control {
+  padding: 0.35rem;
+  font-size: 0.85rem;
+  background-color: #f8f9fa;
+  cursor: pointer;
+}
+
+input[type="file"]::file-selector-button {
+  background-color: var(--accent-color);
+  color: var(--primary-color);
+  border: none;
+  border-radius: 4px;
+  padding: 0.4rem 0.8rem;
+  margin-right: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+input[type="file"]::file-selector-button:hover {
+  background-color: #cce0ff;
+}
+
+.form-text {
+  line-height: 1.6;
+  color: #6c757d;
+}
+
+.form-text code {
+  background-color: #f1f3f5;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  color: #d63384;
+  font-family: monospace;
+}
 </style>

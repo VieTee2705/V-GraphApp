@@ -19,11 +19,6 @@
                       <span class="fw-bold text-primary fs-5">{{distance}}</span>
                   </div>
               </div>
-
-              <div class="mt-4 small text-muted">
-                  <i class="fas fa-info-circle me-1" style="color: var(--primary-color)"></i> 
-                  Thuật toán tự động cập nhật khi cấu trúc đồ thị (đỉnh, cạnh, trọng số) thay đổi.
-              </div>
           </div>
 
           <div v-else class="text-center py-5">
@@ -42,7 +37,60 @@ const props = defineProps({
   end: String
 });
 </script>
-
 <style scoped>
-/* no additional scoped styles */
+/* 1. Ký hiệu Đỉnh trên đường đi */
+.path-badge {
+  background-color: var(--primary-color);
+  color: #ffffff;
+  padding: 6px 14px;
+  border-radius: 20px; /* Bo tròn dạng viên thuốc */
+  font-weight: 700;
+  font-size: 0.9rem;
+  font-family: 'Inter', sans-serif;
+  box-shadow: 0 3px 6px rgba(0, 86, 179, 0.2);
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+.path-badge:hover {
+  transform: translateY(-2px);
+}
+
+/* Mũi tên ngăn cách các đỉnh */
+.fa-chevron-right {
+  font-size: 0.8rem;
+  color: #adb5bd !important;
+  margin: 0 2px;
+}
+
+/* 2. Khối hiển thị Tổng Khoảng Cách */
+.result-highlight-box {
+  background-color: var(--accent-color);
+  border: 2px dashed var(--primary-color);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-top: 1.5rem;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.result-highlight-box .fw-bold.text-primary {
+  color: var(--primary-color) !important;
+  font-size: 1.75rem !important;
+  font-weight: 800 !important;
+  font-family: 'Fira Code', monospace;
+}
+
+/* 3. Empty State (Khi chưa có kết quả) */
+.text-muted {
+  color: #6c757d !important;
+  line-height: 1.6;
+}
+
+.fa-route {
+  background: -webkit-linear-gradient(#ced4da, #adb5bd);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  opacity: 0.7;
+}
 </style>

@@ -4,16 +4,16 @@
     <!-- Header Điều hướng -->
     <header class="app-header d-flex justify-content-between align-items-center px-4 py-2 border-bottom shadow-sm">
       <div class="d-flex align-items-center gap-4">
-        <h5 class="mb-0 text-primary fw-bold"><i class="fas fa-network-wired me-2"></i>Graph Algo</h5>
+        <h5 class="mb-0 text-primary fw-bold"><i class="fas fa-network-wired me-2"></i>V-Graph</h5>
         <ul class="nav nav-pills">
           <li class="nav-item">
             <button class="nav-link fw-bold" :class="{ active: currentPage === 1 }" @click="currentPage = 1">
-              <i class="fas fa-draw-polygon me-1"></i> Trang 1: Đồ thị & Thuật toán
+              <i class="fas fa-draw-polygon me-1"></i> Đồ thị & Thuật toán
             </button>
           </li>
           <li class="nav-item ms-2">
             <button class="nav-link fw-bold" :class="{ active: currentPage === 2 }" @click="currentPage = 2">
-              <i class="fas fa-layer-group me-1"></i> Trang 2: Bộ phận liên thông
+              <i class="fas fa-layer-group me-1"></i> Bộ phận liên thông
             </button>
           </li>
         </ul>
@@ -93,7 +93,7 @@
           @create-node="handleCreateNodeFromCanvas"
           @create-edge="handleCreateEdgeFromCanvas"
         />
-        <NavBar 
+        <ToolBar 
           :start="search.start"
           :end="search.end"
           v-model:isDirected="isDirected"
@@ -101,13 +101,12 @@
           @run-algorithm="runAlgorithm"
           @delete-all="handleDeleteAll"
           @export-graph="handleExportGraph"
-          @fix-nodes="handleFixAllNodes"
         />
       </div>
 
       <!-- Bảng AnotherSet được ẩn/hiện -->
       <div class="col-3 app-side-panel slide-in-right" v-if="showAnotherSet">
-        <AnotherSet
+        <SidePanel
           :result="result"
           :start="search.start"
           :end="search.end"
@@ -120,7 +119,10 @@
     <!-- TRANG 2: Bộ phận liên thông -->
     <div class="row flex-grow-1 m-0 p-4" v-if="currentPage === 2" style="background-color: #f8f9fa; min-height: 0; overflow-y: auto;">
       <div class="col-12 col-lg-8 mx-auto" style="height: 100%;">
-        <ConnectedComponents :components="connectedComponentsList" />
+        <ConnectedComponents 
+          :components="connectedComponentsList" 
+          :isDirected="isDirected" 
+        />
       </div>
     </div>
 
@@ -132,8 +134,8 @@ import { reactive, ref, computed, watch, onMounted, onUnmounted, nextTick } from
 import debounce from 'lodash/debounce';
 import InputView from './components/InputView2.vue';
 import GraphCanvas from './components/GraphCanvas.vue';
-import AnotherSet from './components/AnotherSet.vue';
-import NavBar from './components/NavBar.vue';
+import SidePanel from './components/SidePanel.vue';
+import ToolBar from './components/ToolBar.vue';
 import ConnectedComponents from './components/ConnectedComponents.vue'; 
 import PseudoCode from './components/PseudoCode.vue';
 import { Graph } from './Graph.js'; 
@@ -417,22 +419,10 @@ const runAlgorithm = () => {
         animNeighborNode.value = null;
         break;
       case 'DONE':
-        // Xử lý tạo mảng Edge ID để tô đậm đường đi
-        const pathNodes = state.path;
-        const pathEdgesIds = [];
-        for (let i = 0; i < pathNodes.length - 1; i++) {
-          const u = pathNodes[i];
-          const v = pathNodes[i+1];
-          const edgeId = Object.keys(myGraph.edges).find(id => {
-            const e = myGraph.edges[id];
-            return (e.source === u && e.target === v) || (!isDirected.value && e.source === v && e.target === u);
-          });
-          if (edgeId) pathEdgesIds.push(edgeId);
-        }
-        
-        animPathEdges.value = pathEdgesIds;
-        result.path = pathNodes;
-        result.pathEdges = pathEdgesIds;
+        // SỬA TẠI ĐÂY: Lấy trực tiếp mảng cung tối ưu từ thuật toán trả về
+        animPathEdges.value = state.pathEdges;
+        result.path = state.path;
+        result.pathEdges = state.pathEdges;
         result.totalDistance = state.distances[search.end] !== Infinity ? state.distances[search.end] : 0;
         break;
     }
@@ -464,7 +454,14 @@ onUnmounted(() => {
 
 // --- COMPUTEDS CHO TRANG 2 ---
 const connectedComponentsList = computed(() => {
-  if (Object.keys(myGraph.nodes).length === 0) return [];
+  // MẸO: Truy cập các giá trị này để ép Vue tạo dependency. 
+  // Mỗi khi số lượng đỉnh, số cạnh, hoặc chế độ có hướng thay đổi, computed sẽ tự chạy lại.
+  const _trackNodesCount = Object.keys(myGraph.nodes).length;
+  const _trackEdgesCount = Object.keys(myGraph.edges).length;
+  const _trackDirected = isDirected.value;
+
+  if (_trackNodesCount === 0) return [];
+  
   return myGraph.getConnectedComponents();
 });
 

@@ -85,40 +85,93 @@ const formatInf = (val) => {
 </script>
 
 <style scoped>
+/* 1. Container chính của thẻ Code */
 .pseudo-code-card {
-  border: 1px solid var(--border-color, #dee2e6);
-  border-radius: 8px;
-  background-color: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background-color: var(--bg-color);
+  
+ /* Thiết lập chiều cao cố định để không bị nhảy */ 
+  height: 100%; 
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; 
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+/* 2. Header của thẻ Code */
+.code-header {
+  background-color: var(--accent-color) !important; /* Ghi đè bg-dark của Bootstrap */
+  color: var(--primary-color) !important;           /* Ghi đè text-white */
+  border-bottom: 1px solid var(--border-color);
+  padding: 1rem !important; /* Đồng bộ padding với card-header-component */
+  border-radius: 12px 12px 0 0 !important;
 }
 
+/* 3. Phần thân chứa Code */
+.code-body {
+  background-color: #FAFAFB !important; /* Màu nền xám cực nhạt để tách biệt vùng code */
+  color: var(--text-main);
+  padding: 1.25rem !important;
+  border-radius: 0 0 12px 12px !important;
+}
+
+/* Tùy chỉnh thanh cuộn ngang (nếu code quá dài) */
+.code-body::-webkit-scrollbar {
+  height: 6px;
+}
+.code-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.code-body::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 10px;
+}
+
+/* 4. Dòng code & Trạng thái Active (Highlight) */
 .code-line {
-  line-height: 1.6;
-  padding: 2px 4px;
+  line-height: 1.7;
+  padding: 4px 8px;
   border-radius: 4px;
-  transition: background-color 0.3s ease;
-  color: #24292e;
+  border-left: 4px solid transparent; /* Giữ khoảng trống để khi active không bị giật layout */
+  transition: all 0.3s ease;
+  color: var(--text-main);
 }
 
 .code-line.active-line {
-  background-color: #fff3cd; /* Màu vàng nhạt highlight */
-  border-left: 4px solid #ffc107;
-  font-weight: bold;
+  background-color: var(--accent-color); /* Dùng màu xanh nhạt của theme */
+  border-left: 4px solid var(--primary-color); /* Viền trái màu xanh đậm của theme */
+  color: var(--primary-color);
 }
 
-.keyword { color: #d73a49; font-weight: bold; }
-.function { color: #6f42c1; font-weight: bold; }
-.number { color: #005cc5; }
-.comment { color: #6a737d; font-style: italic; }
+/* 5. Syntax Highlighting (Màu sắc từ khóa) */
+.keyword { color: var(--primary-color); font-weight: 700; } 
+.function { color: #d63384; font-weight: 700; } /* Màu hồng/tím để nổi bật tên hàm */
+.number { color: #009688; font-weight: 600; } /* Màu xanh ngọc cho số */
+.comment { color: #6c757d; font-style: italic; font-weight: normal; }
 
+/* 6. Thụt lề (Indentation) */
 .indent-1 { margin-left: 1.5rem; }
 .indent-2 { margin-left: 3rem; }
 .indent-3 { margin-left: 4.5rem; }
 .indent-4 { margin-left: 6rem; }
 
+/* 7. Giá trị động (Dynamic Values) */
 .dynamic-val {
-  font-family: 'Inter', sans-serif; /* Dùng font thường cho dễ đọc kết quả */
-  font-size: 12.5px;
-  margin-top: 4px;
-  margin-bottom: 4px;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif; /* Quay về font thường cho dễ đọc */
+  font-size: 13px;
+  margin-top: 6px;
+  margin-bottom: 6px;
+  padding: 4px 8px;
+  background-color: var(--bg-color);
+  border-radius: 6px;
+  border: 1px dashed var(--border-color);
+}
+
+/* Tùy chỉnh nhẹ lại badge của Bootstrap cho hợp theme */
+.badge {
+  font-family: 'Fira Code', 'Courier New', monospace; /* Số trong badge giữ font code */
+  font-weight: 600;
+  padding: 0.35em 0.6em;
+  border-radius: 4px;
 }
 </style>

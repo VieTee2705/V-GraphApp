@@ -197,6 +197,7 @@ const createConfigs = () => {
       label: { visible: true, fontFamily: 'Inter', fontWeight: 'bold', color: '#1A1A1B' }
     },
     edge: {
+      selectable: true,
       normal: {
         // Đổi màu cạnh nối giữa Node hiện tại và Neighbor
         color: edge => {

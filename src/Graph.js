@@ -125,42 +125,50 @@ class Graph {
     const components = [];
     const nodeIds = Object.keys(this.nodes);
 
+    const adj = {};
+    nodeIds.forEach((id) => (adj[id] = []));
+
+    Object.values(this.edges).forEach((edge) => {
+      adj[edge.source].push(edge.target);
+      if (!this.isDirected) {
+        adj[edge.target].push(edge.source);
+      }
+    });
+
+    // Chạy BFS bình thường
     for (const startNodeId of nodeIds) {
-      // Nếu đỉnh này chưa được duyệt qua, nó thuộc về một bộ phận liên thông mới
       if (!visited.has(startNodeId)) {
-        const currentComponent = [];
+        const currentComponentNodes = [];
         const queue = [startNodeId];
         visited.add(startNodeId);
 
-        // Bắt đầu BFS để quét tất cả các đỉnh kết nối với startNodeId
         while (queue.length > 0) {
           const currNodeId = queue.shift();
-          currentComponent.push(currNodeId);
+          currentComponentNodes.push(currNodeId);
 
-          // Tìm các đỉnh kề với currNodeId thông qua danh sách các cạnh
-          for (const edgeId in this.edges) {
-            const edge = this.edges[edgeId];
-            let neighborId = null;
-
-            // Logic điều chỉnh theo loại đồ thị:
-            // - Có hướng: chỉ đi chiều source -> target
-            // - Vô hướng: đi được cả hai chiều
-            if (edge.source === currNodeId) {
-              neighborId = edge.target; // Luôn có thể đi từ source -> target
-            } else if (!this.isDirected && edge.target === currNodeId) {
-              neighborId = edge.source; // Chỉ đi từ target -> source nếu là VÔ HƯỚNG
-            }
-
-            // Nếu kề và chưa từng được thăm thì đưa vào queue
-            if (neighborId && !visited.has(neighborId)) {
+          (adj[currNodeId] || []).forEach((neighborId) => {
+            if (!visited.has(neighborId)) {
               visited.add(neighborId);
               queue.push(neighborId);
             }
-          }
+          });
         }
 
-        // Thêm cụm vừa quét xong vào danh sách tổng
-        components.push(currentComponent);
+        // MỚI: Thay vì chỉ push mảng ID, ta đóng gói luôn Nodes và Edges cho cụm này
+        const compEdges = Object.values(this.edges).filter(
+          (edge) =>
+            currentComponentNodes.includes(String(edge.source)) &&
+            currentComponentNodes.includes(String(edge.target)),
+        );
+
+        // (Tùy chọn) Lấy luôn thông tin node gốc nếu bạn cần
+        const compNodes = currentComponentNodes.map((id) => this.nodes[id]);
+
+        components.push({
+          nodeIds: currentComponentNodes, // Vẫn giữ lại mảng ID cho chắc
+          nodes: compNodes,
+          edges: compEdges,
+        });
       }
     }
 
@@ -208,19 +216,18 @@ class Graph {
         let neighborId = null;
 
         // Logic điều chỉnh theo loại đồ thị:
-        // - Có hướng: chỉ đi chiều source -> target
-        // - Vô hướng: đi được cả hai chiều
         if (edge.source === currNodeId) {
-          neighborId = edge.target; // Luôn có thể đi từ source -> target
+          neighborId = edge.target;
         } else if (!this.isDirected && edge.target === currNodeId) {
-          neighborId = edge.source; // Chỉ đi từ target -> source nếu là VÔ HƯỚNG
+          neighborId = edge.source;
         }
 
         if (neighborId && !visited.has(neighborId)) {
           const alt = distances[currNodeId] + edge.weight;
           if (alt < distances[neighborId]) {
             distances[neighborId] = alt;
-            previous[neighborId] = currNodeId;
+            // SỬA TẠI ĐÂY: Lưu cả đỉnh trước đó VÀ ID của cạnh được chọn
+            previous[neighborId] = { node: currNodeId, edge: edgeId };
           }
         }
       }
@@ -228,17 +235,23 @@ class Graph {
 
     // Tái cấu trúc đường đi nếu có endNodeId
     let path = [];
+    let pathEdges = [];
     if (endNodeId) {
       let temp = endNodeId;
       if (previous[temp] !== null || temp === startNodeId) {
         while (temp !== null) {
           path.unshift(temp);
-          temp = previous[temp];
+          if (previous[temp] !== null) {
+            pathEdges.unshift(previous[temp].edge);
+            temp = previous[temp].node;
+          } else {
+            temp = null;
+          }
         }
       }
     }
 
-    return { distances, previous, path };
+    return { distances, previous, path, pathEdges };
   }
 
   /**
@@ -300,7 +313,8 @@ class Graph {
           const alt = distances[currNodeId] + edge.weight;
           if (alt < distances[neighborId]) {
             distances[neighborId] = alt;
-            previous[neighborId] = currNodeId;
+            // SỬA TẠI ĐÂY: Lưu cả đỉnh trước đó VÀ ID của cạnh được chọn
+            previous[neighborId] = { node: currNodeId, edge: edgeId };
 
             // YIELD 4: Nếu tìm thấy đường ngắn hơn, báo cho UI biết để chớp nháy/cập nhật bảng
             yield {
@@ -318,19 +332,31 @@ class Graph {
     }
 
     // Tái cấu trúc đường đi
-    let path = [];
+    let pathNodes = [];
+    let pathEdgesIds = [];
     if (endNodeId) {
       let temp = endNodeId;
       if (previous[temp] !== null || temp === startNodeId) {
         while (temp !== null) {
-          path.unshift(temp);
-          temp = previous[temp];
+          pathNodes.unshift(temp);
+          if (previous[temp] !== null) {
+            pathEdgesIds.unshift(previous[temp].edge);
+            temp = previous[temp].node;
+          } else {
+            temp = null;
+          }
         }
       }
     }
 
     // YIELD 6: Xong, trả về đường đi để UI tô đậm nét (Highlight Path)
-    yield { type: "DONE", path, distances, previous };
+    yield {
+      type: "DONE",
+      path: pathNodes,
+      pathEdges: pathEdgesIds,
+      distances,
+      previous,
+    };
   }
 }
 
